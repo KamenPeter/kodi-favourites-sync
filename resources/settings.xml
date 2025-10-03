@@ -1,0 +1,13 @@
+<settings>
+  <category label="General">
+    <setting id="nas_path" type="string" label="NAS favourites.xml path"
+             default="smb://NAS/share/kodi/favourites.xml"
+             visible="true"/>
+    <setting id="interval_minutes" type="number" label="Sync interval (minutes)"
+             default="10" visible="true" />
+    <setting id="dry_run" type="bool" label="Dry-run (no writes)"
+             default="false" />
+    <setting id="log_debug" type="bool" label="Verbose logging"
+             default="true" />
+  </category>
+</settings>
