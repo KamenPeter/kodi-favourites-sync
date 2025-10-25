@@ -16,7 +16,7 @@ Synchronise the active profile's `favourites.xml` with a cloud or network locati
 ## Quick install
 
 1. In Kodi, Settings → Add-ons → Install from zip
-2. Choose the built zip: `dist/plugin.service.favourites-sync-1.0.2.zip`
+2. Choose the built zip: `dist/plugin.service.favourites-sync-1.0.8.zip`
 3. Open the add-on's Settings → Cloud Location, configure WebDAV and press "Validate endpoint" (or simply close Settings to auto-validate)
 4. Run the add-on and choose a sync action
 
@@ -37,9 +37,9 @@ python tools/build_repo.py
 
 Artifacts:
 
-- `dist/plugin.service.favourites-sync-1.0.2.zip`
+- `dist/plugin.service.favourites-sync-1.0.8.zip`
 - `repo-root/addons.xml`, `repo-root/addons.xml.md5`
-- `repo-root/plugin.service.favourites-sync/plugin.service.favourites-sync-1.0.2.zip`
+- `repo-root/plugin.service.favourites-sync/plugin.service.favourites-sync-1.0.8.zip`
 - `repo-root/repository.kamen/repository.kamen-1.0.0.zip`
 
 ## Publish (OTA hosting)

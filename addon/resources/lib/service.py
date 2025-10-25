@@ -18,6 +18,29 @@ except Exception:
 
 def run():
     monitor = _Monitor()
+    addon = xbmcaddon.Addon()
+    
+    # Check if this is first run (show welcome dialog)
+    first_run = addon.getSetting("first_run_done") != "true"
+    if first_run:
+        # Wait a bit for Kodi to fully start
+        if not monitor.waitForAbort(3):
+            import xbmcgui
+            dialog = xbmcgui.Dialog()
+            
+            # Show welcome message and offer to configure
+            if dialog.yesno(
+                addon.getAddonInfo("name"),
+                "Thank you for installing Favourites Sync!\n\nWould you like to configure your cloud storage connection now?",
+                nolabel="Later",
+                yeslabel="Configure Now"
+            ):
+                # Open settings to cloud category
+                addon.openSettings()
+            
+            # Mark first run as done
+            addon.setSetting("first_run_done", "true")
+    
     # Try start JSON-RPC server (localhost-only)
     try:
         rpc.start_server()
@@ -43,12 +66,9 @@ def run():
 
 class _Monitor(xbmc.Monitor):
     def onSettingsChanged(self):
-        # Attempt auto-validate on any settings change
-        res = validate_endpoint()
-        if not res.get("ok"):
-            log_error(kvfmt(event="auto_validate_failed", error=res.get("error")))
-        else:
-            log_info(kvfmt(event="auto_validate_ok"))
+        # Don't auto-validate on every change to avoid infinite loops
+        # Validation should be triggered explicitly via the validate button
+        pass
 
 if __name__ == "__main__":
     run()

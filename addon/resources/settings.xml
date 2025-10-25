@@ -1,19 +1,19 @@
 <settings>
   <category id="cloud" label="Cloud Location (Required)">
-    <setting id="backend" type="enum" label="Backend Type" lvalues="WebDAV|S3|HTTP(S)|SFTP|SMB/NAS|NFS|Local Path" default="0"/>
-    <setting id="profile_subfolder" type="text" label="Profile subfolder (e.g. {profile})" default="{profile}" visible="true"/>
+    <setting id="backend" type="enum" label="Type" values="WebDAV|S3|HTTP(S)|SFTP|SMB/NAS|NFS|Local Path" default="0"/>
+    <setting id="backend_note" type="lsep" label="Note: Only WebDAV is currently implemented"/>
     <setting id="webdav_url" type="text" label="WebDAV URL" default="" visible="eq(-2,0)"/>
     <setting id="webdav_path" type="text" label="Path to file" default="/kodi/favourites/{profile}/favourites.xml" visible="eq(-3,0)"/>
     <setting id="webdav_user" type="text" label="Username" default="" visible="eq(-4,0)"/>
-    <setting id="webdav_password" type="password" label="Password" default="" visible="eq(-5,0)"/>
-    <setting id="tls_verify" type="bool" label="Validate TLS certificates" default="true" visible="true"/>
-    <setting id="custom_ca" type="text" label="Custom CA bundle path" default=""/>
+    <setting id="webdav_password" type="text" option="hidden" label="Password" default="" visible="eq(-5,0)"/>
+    <setting id="tls_verify" type="bool" label="Validate TLS certificates" default="true" visible="eq(-6,0)"/>
+    <setting id="custom_ca" type="text" label="Custom CA bundle path" default="" visible="eq(-7,0)"/>
     <setting id="s3_endpoint" type="text" label="S3 Endpoint (e.g., s3.amazonaws.com)" default="" visible="eq(-8,1)"/>
     <setting id="s3_region" type="text" label="S3 Region" default="us-east-1" visible="eq(-9,1)"/>
     <setting id="s3_bucket" type="text" label="Bucket" default="" visible="eq(-10,1)"/>
     <setting id="s3_key" type="text" label="Object Key" default="kodi/favourites/{profile}/favourites.xml" visible="eq(-11,1)"/>
     <setting id="s3_access" type="text" label="Access Key" default="" visible="eq(-12,1)"/>
-    <setting id="s3_secret" type="password" label="Secret Key" default="" visible="eq(-13,1)"/>
+    <setting id="s3_secret" type="text" option="hidden" label="Secret Key" default="" visible="eq(-13,1)"/>
     <setting id="s3_versioning" type="bool" label="Bucket has versioning enabled" default="true" visible="eq(-14,1)"/>
     <setting id="http_get" type="text" label="GET URL" default="" visible="eq(-15,2)"/>
     <setting id="http_put" type="text" label="PUT URL" default="" visible="eq(-16,2)"/>
@@ -21,29 +21,29 @@
     <setting id="sftp_host" type="text" label="SFTP Host" default="" visible="eq(-18,3)"/>
     <setting id="sftp_port" type="number" label="Port" default="22" visible="eq(-19,3)"/>
     <setting id="sftp_user" type="text" label="Username" default="" visible="eq(-20,3)"/>
-    <setting id="sftp_password" type="password" label="Password (or leave empty for key)" default="" visible="eq(-21,3)"/>
+    <setting id="sftp_password" type="text" option="hidden" label="Password (or leave empty for key)" default="" visible="eq(-21,3)"/>
     <setting id="sftp_keyfile" type="file" label="Private Key (optional)" default="" visible="eq(-22,3)"/>
     <setting id="sftp_path" type="text" label="Remote Path" default="/mnt/data/kodi/favourites/{profile}/favourites.xml" visible="eq(-23,3)"/>
     <setting id="smb_path" type="text" label="UNC Path (e.g., \\NAS\share\kodi\favourites\{profile}\favourites.xml)" default="" visible="eq(-24,4)"/>
     <setting id="smb_user" type="text" label="Username (optional)" default="" visible="eq(-25,4)"/>
-    <setting id="smb_password" type="password" label="Password (optional)" default="" visible="eq(-26,4)"/>
+    <setting id="smb_password" type="text" option="hidden" label="Password (optional)" default="" visible="eq(-26,4)"/>
     <setting id="nfs_path" type="text" label="NFS Path (or mounted local path)" default="nfs://nas.local/export/kodi/favourites/{profile}/favourites.xml" visible="eq(-27,5)"/>
     <setting id="local_path" type="file" label="Local (synced) file path" default="" visible="eq(-28,6)"/>
-    <setting id="validate_button" type="action" label="Validate endpoint" option="close"/>
+    <setting id="validate_button" type="action" label="Validate endpoint" action="RunScript(special://home/addons/plugin.service.favourites-sync/resources/lib/validate_action.py)" option="close"/>
     <setting id="endpoint_valid" type="bool" label="Endpoint validated" default="false" visible="false"/>
   </category>
   <category id="schedule" label="Scheduling">
     <setting id="schedule_enabled" type="bool" label="Enable scheduled sync" default="false"/>
-    <setting id="schedule_mode" type="enum" label="Schedule mode" lvalues="Interval|Fixed time|On startup only" default="0"/>
+    <setting id="schedule_mode" type="enum" label="Schedule mode" values="Interval|Fixed time|On startup only" default="0"/>
     <setting id="interval_minutes" type="number" label="Interval (minutes)" default="60" visible="eq(-1,0)"/>
     <setting id="fixed_time_local" type="time" label="Fixed time (local)" default="03:30" visible="eq(-2,1)"/>
     <setting id="run_on_startup" type="bool" label="Run on Kodi startup" default="false"/>
     <setting id="startup_delay_seconds" type="number" label="Startup delay (seconds)" default="20" visible="eq(-1,true)"/>
-    <setting id="scheduled_mode" type="enum" label="Default scheduled sync mode" lvalues="Pull (Cloud→Local)|Push (Local→Cloud)|Bidirectional" default="0"/>
+    <setting id="scheduled_mode" type="enum" label="Default scheduled sync mode" values="Pull (Cloud→Local)|Push (Local→Cloud)|Bidirectional" default="0"/>
   </category>
   <category id="conflict" label="Conflict Policy">
-    <setting id="conflict_policy" type="enum" label="Default policy for bidirectional" lvalues="Prefer Cloud|Prefer Local|Bidirectional Merge|Manual Review" default="0"/>
-    <setting id="scheduled_conflict" type="enum" label="When conflict occurs on schedule" lvalues="Prefer Cloud|Prefer Local|Skip & notify" default="0"/>
+    <setting id="conflict_policy" type="enum" label="Default policy for bidirectional" values="Prefer Cloud|Prefer Local|Bidirectional Merge|Manual Review" default="0"/>
+    <setting id="scheduled_conflict" type="enum" label="When conflict occurs on schedule" values="Prefer Cloud|Prefer Local|Skip & notify" default="0"/>
   </category>
   <category id="backups" label="Backups">
     <setting id="local_backups" type="bool" label="Enable local backups" default="true"/>
@@ -55,7 +55,10 @@
     <setting id="retry_count" type="number" label="Retry count" default="2"/>
   </category>
   <category id="logging" label="Logging">
-    <setting id="log_level" type="enum" label="Log level" lvalues="INFO|DEBUG" default="0"/>
+    <setting id="log_level" type="enum" label="Log level" values="INFO|DEBUG" default="0"/>
     <setting id="log_network" type="bool" label="Include network trace (redacted)" default="false"/>
+  </category>
+  <category id="internal" label="Internal" visible="false">
+    <setting id="first_run_done" type="bool" default="false" visible="false"/>
   </category>
 </settings>

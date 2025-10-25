@@ -13,7 +13,12 @@ try:
 except Exception:
     import xmlio
 
-ADDON = xbmcaddon.Addon()
+# Try to initialize addon, with fallback for scripts run outside normal context
+try:
+    ADDON = xbmcaddon.Addon()
+except RuntimeError:
+    ADDON = xbmcaddon.Addon("plugin.service.favourites-sync")
+
 PROFILE = xbmcvfs.translatePath("special://profile/")
 LOCAL_FAV = os.path.join(PROFILE, "favourites.xml")
 ADDON_DATA = xbmcvfs.translatePath(f"special://profile/addon_data/{ADDON.getAddonInfo('id')}")

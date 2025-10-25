@@ -18,8 +18,7 @@ def main():
     dialog = xbmcgui.Dialog()
     if not is_endpoint_valid():
         dialog.ok(addon.getAddonInfo("name"),
-                  "Cloud favourites location is not configured.",
-                  "Open Settings → Cloud Location to set it up.")
+                  "Cloud favourites location is not configured.\nOpen Settings → Cloud Location to set it up.")
         open_settings(category_id="cloud")
         return
     options = [
@@ -29,6 +28,7 @@ def main():
         "Dry-run (Preview)",
         "Restore from Backup…",
         "Last Sync Status",
+        "Add to Favourites",
         "Settings",
     ]
     choice = dialog.select("Favourites Sync", options)
@@ -67,6 +67,64 @@ def main():
         msg = f"Last: {st.get('last_run','-')}\nResult: {st.get('result','-')}\nChanged: {st.get('changed_items',0)}"
         dialog.ok("Last Sync Status", msg)
     elif choice == 6:
+        # Add to Favourites
+        import xbmc
+        addon_id = addon.getAddonInfo('id')
+        addon_name = addon.getAddonInfo('name')
+        
+        # Build the favourite entry
+        favourite_cmd = f"RunScript(special://home/addons/{addon_id}/resources/lib/addon.py)"
+        
+        # Use JSON-RPC to add to favourites
+        json_query = {
+            "jsonrpc": "2.0",
+            "method": "Favourites.AddFavourite",
+            "params": {
+                "title": addon_name,
+                "type": "script",
+                "path": favourite_cmd
+            },
+            "id": 1
+        }
+        
+        try:
+            import json
+            result = xbmc.executeJSONRPC(json.dumps(json_query))
+            result_dict = json.loads(result)
+            
+            if "error" in result_dict:
+                # Fallback: manually edit favourites.xml
+                import xbmcvfs
+                profile = xbmcvfs.translatePath("special://profile/")
+                fav_file = os.path.join(profile, "favourites.xml")
+                
+                # Read existing favourites
+                if os.path.exists(fav_file):
+                    with open(fav_file, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                else:
+                    content = '<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>\n<favourites>\n</favourites>'
+                
+                # Check if already exists
+                if addon_name in content:
+                    dialog.notification("Add to Favourites", "Already in favourites!", xbmcgui.NOTIFICATION_INFO, 3000)
+                else:
+                    # Add new favourite before </favourites>
+                    new_fav = f'    <favourite name="{addon_name}">{favourite_cmd}</favourite>\n'
+                    content = content.replace('</favourites>', new_fav + '</favourites>')
+                    
+                    # Write atomically
+                    tmp = fav_file + ".tmp"
+                    with open(tmp, 'w', encoding='utf-8') as f:
+                        f.write(content)
+                    os.replace(tmp, fav_file)
+                    
+                    dialog.notification("Add to Favourites", "Added successfully!", xbmcgui.NOTIFICATION_INFO, 3000)
+            else:
+                dialog.notification("Add to Favourites", "Added successfully!", xbmcgui.NOTIFICATION_INFO, 3000)
+        except Exception as e:
+            dialog.ok("Error", f"Failed to add to favourites:\n{str(e)}")
+    elif choice == 7:
         open_settings()
         log_info("settings_opened")
 

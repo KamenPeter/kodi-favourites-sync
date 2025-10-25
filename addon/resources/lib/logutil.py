@@ -3,8 +3,18 @@ import time
 import xbmc
 import xbmcaddon
 
-_ADDON = xbmcaddon.Addon()
-_ADDON_ID = _ADDON.getAddonInfo('id')
+# Try to initialize addon, but provide fallback for scripts run outside normal context
+try:
+	_ADDON = xbmcaddon.Addon()
+	_ADDON_ID = _ADDON.getAddonInfo('id')
+except RuntimeError:
+	# Fallback when script is run without proper addon context
+	try:
+		_ADDON = xbmcaddon.Addon("plugin.service.favourites-sync")
+		_ADDON_ID = _ADDON.getAddonInfo('id')
+	except Exception:
+		_ADDON = None
+		_ADDON_ID = "plugin.service.favourites-sync"
 
 def _logfile_path():
 	try:
