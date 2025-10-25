@@ -5,13 +5,13 @@
 ### Quick Install (Recommended)
 
 1. **Download the plugin**:
-   - Navigate to: `dist/plugin.service.favourites-sync-1.0.8.zip`
-   - Or from repo-root: `repo-root/plugin.service.favourites-sync/plugin.service.favourites-sync-1.0.8.zip`
+   - Navigate to: `dist/plugin.service.favourites-sync-1.0.9.zip`
+   - Or from repo-root: `repo-root/plugin.service.favourites-sync/plugin.service.favourites-sync-1.0.9.zip`
 
 2. **Install in Kodi**:
    - Open Kodi
    - Settings → Add-ons → Install from zip file
-   - Navigate to and select `plugin.service.favourites-sync-1.0.8.zip`
+   - Navigate to and select `plugin.service.favourites-sync-1.0.9.zip`
    - Wait for "Add-on installed" notification
 
 3. **Configure**:
@@ -57,7 +57,7 @@ python tools/make_addons_xml.py
 
 ### Output Artifacts
 
-- `dist/plugin.service.favourites-sync-1.0.8.zip` - Installable plugin
+- `dist/plugin.service.favourites-sync-1.0.9.zip` - Installable plugin
 - `repo-root/plugin.service.favourites-sync/` - Plugin for OTA
 - `repo-root/repository.kamen/` - Repository installer
 - `repo-root/addons.xml` + `addons.xml.md5` - OTA manifest
@@ -65,12 +65,12 @@ python tools/make_addons_xml.py
 ## Troubleshooting
 
 ### "Failed to unpack archive"
-- Make sure you're using version 1.0.8 or later
+- Make sure you're using version 1.0.9 or later
 - Delete any old cached ZIP files
 - The ZIP top-level folder MUST be `plugin.service.favourites-sync/`
 
 ### Import errors on startup
-- Version 1.0.8 fixes relative import issues
+- Version 1.0.9 fixes relative import issues
 - Service should start cleanly and log to addon_data/log.txt
 
 ### Icon decode warning
@@ -80,7 +80,7 @@ python tools/make_addons_xml.py
 ## Status
 
 ✅ **Ready for Installation**
-- Version: 1.0.8
+- Version: 1.0.9
 - Kodi Compatibility: Matrix (19) - Omega (21)
 - Python: 3.x
 - Working backend: WebDAV (HTTPS)

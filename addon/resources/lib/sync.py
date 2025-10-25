@@ -122,6 +122,7 @@ def _settings_dict() -> dict:
         "webdav_password": g("webdav_password"),
         "tls_verify": gb("tls_verify", True),
         "custom_ca": g("custom_ca"),
+        "local_path": g("local_path"),
         "timeout_sec": g("timeout_sec", "15"),
         "retry_count": g("retry_count", "2"),
         "backup_count": g("backup_count", "5"),
@@ -139,6 +140,12 @@ def _backend_from_settings(cfg: dict):
         except Exception:
             from drivers import webdav
         return webdav.Driver(cfg)
+    elif backend == "local":
+        try:
+            from .drivers import local
+        except Exception:
+            from drivers import local
+        return local.Driver(cfg)
     # Other backends can be wired here later
     raise IOError("Selected backend not implemented")
 

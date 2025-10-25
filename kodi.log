@@ -1,24 +1,4 @@
-2025-10-25 23:11:36.490 T:66640 warning <general>: CPythonInvoker(19): Script invoked without an addon. Adding all addon modules installed to python path as fallback. This behaviour will be removed in future version.
-2025-10-25 23:11:36.502 T:66640   error <general>: EXCEPTION: No valid addon id could be obtained. None was passed and the script wasn't executed in a normal Kodi manner.
-2025-10-25 23:11:36.505 T:66640   error <general>: EXCEPTION Thrown (PythonToCppException) : -->Python callback/script returned the following error<--
-                                                    - NOTE: IGNORING THIS CAN LEAD TO MEMORY LEAKS!
-                                                   Error Type: <class 'RuntimeError'>
-                                                   Error Contents: No valid addon id could be obtained. None was passed and the script wasn't executed in a normal Kodi manner.
-                                                   Traceback (most recent call last):
-                                                     File "C:\Users\stein\AppData\Roaming\Kodi\addons\plugin.service.favourites-sync\resources\lib\sync.py", line 4, in <module>
-                                                       from .logutil import log_info, log_error, log_debug, kvfmt
-                                                   ImportError: attempted relative import with no known parent package
-                                                   
-                                                   During handling of the above exception, another exception occurred:
-                                                   
-                                                   Traceback (most recent call last):
-                                                     File "C:\Users\stein\AppData\Roaming\Kodi\addons\plugin.service.favourites-sync\resources\lib\validate_action.py", line 4, in <module>
-                                                       from sync import validate_endpoint
-                                                     File "C:\Users\stein\AppData\Roaming\Kodi\addons\plugin.service.favourites-sync\resources\lib\sync.py", line 6, in <module>
-                                                       from logutil import log_info, log_error, log_debug, kvfmt
-                                                     File "C:\Users\stein\AppData\Roaming\Kodi\addons\plugin.service.favourites-sync\resources\lib\logutil.py", line 6, in <module>
-                                                       _ADDON = xbmcaddon.Addon()
-                                                   RuntimeError: No valid addon id could be obtained. None was passed and the script wasn't executed in a normal Kodi manner.
-                                                   -->End of Python script error report<--
-                                                   
-2025-10-25 23:11:36.630 T:64144 warning <general>: CGUIWindowManager - CGUIWindowManager::HandleAction - ignoring action 107, because topmost modal dialog closing animation is running
+2025-10-25 23:28:22.118 T:54664 warning <general>: CPythonInvoker(26): Script invoked without an addon. Adding all addon modules installed to python path as fallback. This behaviour will be removed in future version.
+2025-10-25 23:28:22.131 T:54664   error <general>: EXCEPTION: No valid addon id could be obtained. None was passed and the script wasn't executed in a normal Kodi manner.
+2025-10-25 23:28:22.157 T:54664    info <general>: Skipped 1 duplicate messages..
+2025-10-25 23:28:22.157 T:54664    info <general>: [fav-sync] event=validate_ok backend=local etag=1743543101.6194406 size=3193

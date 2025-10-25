@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.9 (2025-10-25)
+
+- Added: Local Path backend driver - supports local files and Windows UNC paths (\\server\share)
+- Added: Full implementation of Local Path driver with stat(), download(), upload(), copy_backup()
+- Fixed: Atomic writes for local files (write to .tmp then rename)
+- Fixed: Auto-create parent directories if they don't exist
+- Updated: Settings note now shows "WebDAV and Local Path are currently implemented"
+- Now supports: Network shares (\\NAS\share\path) and local paths (C:\sync\path)
+
 ## 1.0.8 (2025-10-25)
 
 - Fixed: Validate endpoint button crash - "No valid addon id could be obtained" error
