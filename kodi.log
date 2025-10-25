@@ -1,0 +1,203 @@
+2025-10-25 12:46:31.658 T:64144   debug <general>: ------ Window Init (Pointer.xml) ------
+2025-10-25 12:46:33.116 T:64144   debug <general>: CInputManager::ProcessMouse: trying mouse action leftclick
+2025-10-25 12:46:33.249 T:64144   debug <general>: CInputManager::ProcessMouse: trying mouse action doubleclick
+2025-10-25 12:46:33.249 T:64144 warning <general>: CGUIWindowManager - CGUIWindowManager::HandleAction - ignoring action 103, because topmost modal dialog closing animation is running
+2025-10-25 12:46:33.354 T:64144   debug <general>: ------ Window Deinit (FileBrowser.xml) ------
+2025-10-25 12:46:33.358 T:64144   debug <general>: CAddonInstaller: installing from zip 'C:\Users\stein\GitHub\kodi-favourites-sync\repo-root\plugin.service.favourites-sync\plugin.service.favourites-sync-1.0.1.zip'
+2025-10-25 12:46:33.359 T:56048   debug <general>: Thread JobWorker start, auto delete: true
+2025-10-25 12:46:33.360 T:56048   debug <general>: CAddonDatabase: SELECT repo.id FROM repo .. took 0 ms
+2025-10-25 12:46:33.363 T:56048   debug <general>: CAddonDatabase: query  SELECT addons.*, repo.addonID AS repoID FROM addons JOIN addonlinkrepo ON addons.id=addonlinkrepo.idAddon JOIN repo ON repo.id=addonlinkrepo.idRepo WHERE addonlinkrepo.idRepo IN (1,2) ORDER BY repo.addonID, addons.addonID returned 1126 rows in 3 ms
+2025-10-25 12:46:33.364 T:56048   error <general>: Repository add-on repository.beam.xbmc-addons uses old schema definition for the repository extension point! This is no longer supported, please update your addon to use <dir> definitions.
+2025-10-25 12:46:33.364 T:56048   error <general>: Repository add-on repository.beam.xbmc-addons does not have any directory matching 21.2.0 and won't be able to update/serve addons! Please fix the addon.xml definition
+2025-10-25 12:46:33.384 T:56048   debug <general>: CAddonDatabase::GetAddons took 24 ms
+2025-10-25 12:46:33.386 T:56048   debug <general>: ADDON::CAddonRepos::LoadAddonsFromDatabase: repository.cder.sk - 76 addon(s) loaded
+2025-10-25 12:46:33.386 T:56048   debug <general>: ADDON::CAddonRepos::LoadAddonsFromDatabase: repository.xbmc.org - 1030 addon(s) loaded
+2025-10-25 12:46:33.388 T:56048   debug <general>: Unpacking zip://C%3a%5cUsers%5cstein%5cGitHub%5ckodi-favourites-sync%5crepo-root%5cplugin.service.favourites-sync%5cplugin.service.favourites-sync-1.0.1.zip/plugin.service.favourites-sync/ to C:\Users\stein\AppData\Roaming\Kodi\addons\temp\9f29e201-00a7-4914-8b9a-e97339f54a44
+2025-10-25 12:46:33.412 T:56048   debug <general>: CAddonInfoBuilder::ParseXMLTypes: Binary addon found: peripheral.joystick
+2025-10-25 12:46:33.418 T:56048   debug <general>: CAddonMgr::ADDON::CAddonMgr::FindAddons: Addon 'game.controller.snes' already present with version 1.0.40 at 'C:\Program Files\Kodi\addons\game.controller.snes\' replaced with version 1.0.43 at 'C:\Users\stein\AppData\Roaming\Kodi\addons\game.controller.snes\'
+2025-10-25 12:46:33.418 T:56048   debug <general>: CAddonInfoBuilder::ParseXMLTypes: Binary addon found: inputstream.adaptive
+2025-10-25 12:46:33.419 T:56048   debug <general>: CAddonMgr::ADDON::CAddonMgr::FindAddons: Addon 'metadata.album.universal' already present with version 3.1.4 at 'C:\Program Files\Kodi\addons\metadata.album.universal\' replaced with version 3.1.17 at 'C:\Users\stein\AppData\Roaming\Kodi\addons\metadata.album.universal\'
+2025-10-25 12:46:33.419 T:56048   debug <general>: CAddonMgr::ADDON::CAddonMgr::FindAddons: Addon 'metadata.artists.universal' already present with version 4.3.3 at 'C:\Program Files\Kodi\addons\metadata.artists.universal\' replaced with version 4.3.19 at 'C:\Users\stein\AppData\Roaming\Kodi\addons\metadata.artists.universal\'
+2025-10-25 12:46:33.420 T:56048   debug <general>: CAddonMgr::ADDON::CAddonMgr::FindAddons: Addon 'metadata.common.fanart.tv' already present with version 3.6.3 at 'C:\Program Files\Kodi\addons\metadata.common.fanart.tv\' replaced with version 3.6.4 at 'C:\Users\stein\AppData\Roaming\Kodi\addons\metadata.common.fanart.tv\'
+2025-10-25 12:46:33.420 T:56048   debug <general>: CAddonMgr::ADDON::CAddonMgr::FindAddons: Addon 'metadata.generic.albums' already present with version 1.0.14 at 'C:\Program Files\Kodi\addons\metadata.generic.albums\' replaced with version 1.0.18 at 'C:\Users\stein\AppData\Roaming\Kodi\addons\metadata.generic.albums\'
+2025-10-25 12:46:33.420 T:56048   debug <general>: CAddonMgr::ADDON::CAddonMgr::FindAddons: Addon 'metadata.themoviedb.org.python' already present with version 1.3.1+matrix.1 at 'C:\Program Files\Kodi\addons\metadata.themoviedb.org.python\' replaced with version 3.1.3 at 'C:\Users\stein\AppData\Roaming\Kodi\addons\metadata.themoviedb.org.python\'
+2025-10-25 12:46:33.421 T:56048   debug <general>: CAddonMgr::ADDON::CAddonMgr::FindAddons: Addon 'metadata.tvshows.themoviedb.org.python' already present with version 1.6.0 at 'C:\Program Files\Kodi\addons\metadata.tvshows.themoviedb.org.python\' replaced with version 1.7.4 at 'C:\Users\stein\AppData\Roaming\Kodi\addons\metadata.tvshows.themoviedb.org.python\'
+2025-10-25 12:46:33.434 T:56048   debug <general>: CAddonMgr::ADDON::CAddonMgr::FindAddons: Addon 'service.xbmc.versioncheck' already present with version 0.5.27+matrix.1 at 'C:\Program Files\Kodi\addons\service.xbmc.versioncheck\' replaced with version 0.5.30+matrix.1 at 'C:\Users\stein\AppData\Roaming\Kodi\addons\service.xbmc.versioncheck\'
+2025-10-25 12:46:33.434 T:56048    info <general>: CAddonMgr::ADDON::CAddonMgr::FindAddon: plugin.service.favourites-sync v1.0.1 installed
+2025-10-25 12:46:33.441 T:34548   debug <general>: Thread JobWorker start, auto delete: true
+2025-10-25 12:46:33.441 T:56048   debug <general>: CAddonMgr: plugin.service.favourites-sync successfully loaded
+2025-10-25 12:46:33.441 T:34548   debug <general>: ContextMenuManager: addon menus reloaded.
+2025-10-25 12:46:33.441 T:34548   debug <general>: CServiceAddonManager: starting plugin.service.favourites-sync
+2025-10-25 12:46:33.441 T:56048   debug <general>: LocalizeStrings: loaded 0 strings from file C:\Users\stein\AppData\Roaming\Kodi\addons\plugin.service.favourites-sync\resources\language\resource.language.en_gb\strings.po
+2025-10-25 12:46:33.441 T:49556   debug <general>: Thread LanguageInvoker start, auto delete: false
+2025-10-25 12:46:33.441 T:49556   debug <general>: initializing python engine.
+2025-10-25 12:46:33.441 T:49556   debug <general>: CPythonInvoker(7, C:\Users\stein\AppData\Roaming\Kodi\addons\plugin.service.favourites-sync\resources\lib\service.py): start processing
+2025-10-25 12:46:33.442 T:56048   debug <general>: CAddonMgr::GetCompatibleVersions took 0 ms
+2025-10-25 12:46:33.442 T:56048   debug <general>: ADDONS: unpinned zip installed Addon: [plugin.service.favourites-sync] Version: [1.0.1]
+2025-10-25 12:46:33.445 T:64144   debug <general>: CGUIMediaWindow::GetDirectory (addons://)
+2025-10-25 12:46:33.445 T:64144   debug <general>:   ParentPath = [addons://]
+2025-10-25 12:46:33.446 T:57768   debug <general>: Thread waiting start, auto delete: false
+2025-10-25 12:46:33.446 T:57768   debug <general>: CAddonDatabase: SELECT repo.id FROM repo .. took 0 ms
+2025-10-25 12:46:33.449 T:49556   debug <general>: -->Python Interpreter Initialized<--
+2025-10-25 12:46:33.449 T:49556   debug <general>: 
+                                                   
+2025-10-25 12:46:33.449 T:49556   debug <general>: CPythonInvoker(7, C:\Users\stein\AppData\Roaming\Kodi\addons\plugin.service.favourites-sync\resources\lib\service.py): the source file to load is "C:\Users\stein\AppData\Roaming\Kodi\addons\plugin.service.favourites-sync\resources\lib\service.py"
+2025-10-25 12:46:33.449 T:49556   debug <general>: CPythonInvoker(7): full python path:
+2025-10-25 12:46:33.449 T:49556   debug <general>: CPythonInvoker(7):   custom python path:
+2025-10-25 12:46:33.449 T:49556   debug <general>: CPythonInvoker(7):     C:\Users\stein\AppData\Roaming\Kodi\addons\plugin.service.favourites-sync\resources\lib
+2025-10-25 12:46:33.449 T:49556   debug <general>: CPythonInvoker(7):   default python path:
+2025-10-25 12:46:33.449 T:49556   debug <general>: CPythonInvoker(7):     C:\Program Files\Kodi\system\python\DLLs
+2025-10-25 12:46:33.449 T:49556   debug <general>: CPythonInvoker(7):     C:\Program Files\Kodi\system\python\Lib
+2025-10-25 12:46:33.449 T:49556   debug <general>: CPythonInvoker(7):     C:\Program Files\Kodi\system\python\Lib\site-packages
+2025-10-25 12:46:33.449 T:49556   debug <general>: CPythonInvoker(7): adding args:
+2025-10-25 12:46:33.449 T:49556   debug <general>: CPythonInvoker(7):  
+2025-10-25 12:46:33.449 T:49556   debug <general>: CPythonInvoker(7, C:\Users\stein\AppData\Roaming\Kodi\addons\plugin.service.favourites-sync\resources\lib\service.py): entering source directory C:\Users\stein\AppData\Roaming\Kodi\addons\plugin.service.favourites-sync\resources\lib
+2025-10-25 12:46:33.449 T:49556   debug <general>: CPythonInvoker(7, C:\Users\stein\AppData\Roaming\Kodi\addons\plugin.service.favourites-sync\resources\lib\service.py): instantiating addon using automatically obtained id of "plugin.service.favourites-sync" dependent on version 3.0.0 of the xbmc.python api
+2025-10-25 12:46:33.449 T:57768   debug <general>: CAddonDatabase: query  SELECT addons.*, repo.addonID AS repoID FROM addons JOIN addonlinkrepo ON addons.id=addonlinkrepo.idAddon JOIN repo ON repo.id=addonlinkrepo.idRepo WHERE addonlinkrepo.idRepo IN (1,2) ORDER BY repo.addonID, addons.addonID returned 1126 rows in 3 ms
+2025-10-25 12:46:33.450 T:57768   error <general>: Repository add-on repository.beam.xbmc-addons uses old schema definition for the repository extension point! This is no longer supported, please update your addon to use <dir> definitions.
+2025-10-25 12:46:33.450 T:57768   error <general>: Repository add-on repository.beam.xbmc-addons does not have any directory matching 21.2.0 and won't be able to update/serve addons! Please fix the addon.xml definition
+2025-10-25 12:46:33.471 T:57768   debug <general>: CAddonDatabase::GetAddons took 25 ms
+2025-10-25 12:46:33.473 T:57768   debug <general>: ADDON::CAddonRepos::LoadAddonsFromDatabase: repository.cder.sk - 76 addon(s) loaded
+2025-10-25 12:46:33.473 T:57768   debug <general>: ADDON::CAddonRepos::LoadAddonsFromDatabase: repository.xbmc.org - 1030 addon(s) loaded
+2025-10-25 12:46:33.474 T:57768   debug <general>: ADDON::CAddonRepos::BuildUpdateOrOutdatedList: Building update list from installed add-ons
+2025-10-25 12:46:33.474 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = audioencoder.kodi.builtin.aac / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 1.0.2
+2025-10-25 12:46:33.474 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = audioencoder.kodi.builtin.wma / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 1.0.2
+2025-10-25 12:46:33.474 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = game.controller.default / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 1.0.42
+2025-10-25 12:46:33.474 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = game.controller.keyboard / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 1.1.43
+2025-10-25 12:46:33.474 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = game.controller.mouse / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 1.0.26
+2025-10-25 12:46:33.474 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = game.controller.snes / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 1.0.43
+2025-10-25 12:46:33.474 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = inputstream.adaptive / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 21.5.16
+2025-10-25 12:46:33.474 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = metadata.album.universal / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 3.1.17
+2025-10-25 12:46:33.474 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = metadata.artists.universal / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 4.3.19
+2025-10-25 12:46:33.474 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = metadata.common.allmusic.com / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 3.2.2
+2025-10-25 12:46:33.474 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = metadata.common.fanart.tv / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 3.6.4
+2025-10-25 12:46:33.474 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = metadata.common.musicbrainz.org / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 2.2.4
+2025-10-25 12:46:33.474 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = metadata.common.theaudiodb.com / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 2.0.3
+2025-10-25 12:46:33.474 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = metadata.generic.albums / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 1.0.18
+2025-10-25 12:46:33.474 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = metadata.generic.artists / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 1.0.18
+2025-10-25 12:46:33.474 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = metadata.local / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 1.0.1
+2025-10-25 12:46:33.474 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = metadata.themoviedb.org.python / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 3.1.3
+2025-10-25 12:46:33.474 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = metadata.tvshows.themoviedb.org.python / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 1.7.4
+2025-10-25 12:46:33.474 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = peripheral.joystick / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 21.1.22
+2025-10-25 12:46:33.474 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = plugin.library.node.editor / Origin = repository.xbmc.org / Version = 2.0.5
+2025-10-25 12:46:33.475 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = plugin.service.favourites-sync / Origin =  / Version = 1.0.1
+2025-10-25 12:46:33.475 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = plugin.video.stream-cinema / Origin = repository.cder.sk / Version = 2.5.10.1+k19
+2025-10-25 12:46:33.475 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = repository.cder.sk / Origin = repository.cder.sk / Version = 1.0.4
+2025-10-25 12:46:33.475 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = repository.xbmc.org / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 3.4.0
+2025-10-25 12:46:33.475 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = resource.images.weathericons.default / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 1.1.9
+2025-10-25 12:46:33.475 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = resource.language.en_gb / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 2.0.2
+2025-10-25 12:46:33.475 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = resource.uisounds.kodi / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 1.0.1
+2025-10-25 12:46:33.475 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = screensaver.xbmc.builtin.black / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 1.0.34
+2025-10-25 12:46:33.475 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = screensaver.xbmc.builtin.dim / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 1.0.66
+2025-10-25 12:46:33.475 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = script.module.arrow / Origin = repository.xbmc.org / Version = 1.2.3
+2025-10-25 12:46:33.475 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = script.module.certifi / Origin = repository.xbmc.org / Version = 2023.5.7
+2025-10-25 12:46:33.475 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = script.module.chardet / Origin = repository.xbmc.org / Version = 5.1.0
+2025-10-25 12:46:33.475 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = script.module.dateutil / Origin = repository.xbmc.org / Version = 2.8.2
+2025-10-25 12:46:33.475 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = script.module.idna / Origin = repository.xbmc.org / Version = 3.10.0
+2025-10-25 12:46:33.475 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = script.module.inputstreamhelper / Origin = repository.xbmc.org / Version = 0.8.3
+2025-10-25 12:46:33.475 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = script.module.pil / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 5.1.0
+2025-10-25 12:46:33.475 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = script.module.pycryptodome / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 3.4.3
+2025-10-25 12:46:33.475 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = script.module.requests / Origin = repository.xbmc.org / Version = 2.31.0
+2025-10-25 12:46:33.475 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = script.module.six / Origin = repository.xbmc.org / Version = 1.16.0+matrix.1
+2025-10-25 12:46:33.475 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = script.module.trakt / Origin = repository.xbmc.org / Version = 4.4.0+matrix.1
+2025-10-25 12:46:33.475 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = script.module.typing_extensions / Origin = repository.xbmc.org / Version = 4.7.1
+2025-10-25 12:46:33.475 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = script.module.unidecode / Origin = repository.xbmc.org / Version = 1.3.6
+2025-10-25 12:46:33.475 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = script.module.urllib3 / Origin = repository.xbmc.org / Version = 2.2.3
+2025-10-25 12:46:33.475 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = script.module.websocket / Origin = repository.xbmc.org / Version = 1.6.4
+2025-10-25 12:46:33.475 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = service.upnext / Origin = repository.xbmc.org / Version = 1.1.9+matrix.1
+2025-10-25 12:46:33.475 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = service.xbmc.versioncheck / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 0.5.30+matrix.1
+2025-10-25 12:46:33.475 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = skin.estuary / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 4.0.0
+2025-10-25 12:46:33.475 T:57768   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = webinterface.default / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 21.x-1.0.1
+2025-10-25 12:46:33.475 T:57768   debug <general>: CAddonMgr::GetAvailableUpdatesOrOutdatedAddons took 29 ms
+2025-10-25 12:46:33.475 T:49556   error <general>: EXCEPTION Thrown (PythonToCppException) : -->Python callback/script returned the following error<--
+                                                    - NOTE: IGNORING THIS CAN LEAD TO MEMORY LEAKS!
+                                                   Error Type: <class 'AttributeError'>
+                                                   Error Contents: module 'xbmc' has no attribute 'translatePath'
+                                                   Traceback (most recent call last):
+                                                     File "C:\Users\stein\AppData\Roaming\Kodi\addons\plugin.service.favourites-sync\resources\lib\service.py", line 11, in <module>
+                                                       from .sync import run_scheduled_once, validate_endpoint
+                                                   ImportError: attempted relative import with no known parent package
+                                                   
+                                                   During handling of the above exception, another exception occurred:
+                                                   
+                                                   Traceback (most recent call last):
+                                                     File "C:\Users\stein\AppData\Roaming\Kodi\addons\plugin.service.favourites-sync\resources\lib\service.py", line 13, in <module>
+                                                       from sync import run_scheduled_once, validate_endpoint
+                                                     File "C:\Users\stein\AppData\Roaming\Kodi\addons\plugin.service.favourites-sync\resources\lib\sync.py", line 17, in <module>
+                                                       PROFILE = xbmc.translatePath("special://profile/")
+                                                   AttributeError: module 'xbmc' has no attribute 'translatePath'
+                                                   -->End of Python script error report<--
+                                                   
+2025-10-25 12:46:33.477 T:57768   debug <general>: Thread waiting 57768 terminating
+2025-10-25 12:46:33.478 T:44596   debug <general>: Thread BackgroundLoader start, auto delete: false
+2025-10-25 12:46:33.479 T:44596   debug <general>: Thread BackgroundLoader 44596 terminating
+2025-10-25 12:46:33.479 T:64144   debug <general>: CGUIMediaWindow::GetDirectory (addons://)
+2025-10-25 12:46:33.479 T:64144   debug <general>:   ParentPath = [addons://]
+2025-10-25 12:46:33.479 T:82120   debug <general>: Thread waiting start, auto delete: false
+2025-10-25 12:46:33.479 T:82120   debug <general>: CAddonDatabase: SELECT repo.id FROM repo .. took 0 ms
+2025-10-25 12:46:33.483 T:82120   debug <general>: CAddonDatabase: query  SELECT addons.*, repo.addonID AS repoID FROM addons JOIN addonlinkrepo ON addons.id=addonlinkrepo.idAddon JOIN repo ON repo.id=addonlinkrepo.idRepo WHERE addonlinkrepo.idRepo IN (1,2) ORDER BY repo.addonID, addons.addonID returned 1126 rows in 3 ms
+2025-10-25 12:46:33.484 T:82120   error <general>: Repository add-on repository.beam.xbmc-addons uses old schema definition for the repository extension point! This is no longer supported, please update your addon to use <dir> definitions.
+2025-10-25 12:46:33.484 T:82120   error <general>: Repository add-on repository.beam.xbmc-addons does not have any directory matching 21.2.0 and won't be able to update/serve addons! Please fix the addon.xml definition
+2025-10-25 12:46:33.503 T:82120   debug <general>: CAddonDatabase::GetAddons took 23 ms
+2025-10-25 12:46:33.505 T:82120   debug <general>: ADDON::CAddonRepos::LoadAddonsFromDatabase: repository.cder.sk - 76 addon(s) loaded
+2025-10-25 12:46:33.505 T:82120   debug <general>: ADDON::CAddonRepos::LoadAddonsFromDatabase: repository.xbmc.org - 1030 addon(s) loaded
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::BuildUpdateOrOutdatedList: Building update list from installed add-ons
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = audioencoder.kodi.builtin.aac / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 1.0.2
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = audioencoder.kodi.builtin.wma / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 1.0.2
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = game.controller.default / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 1.0.42
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = game.controller.keyboard / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 1.1.43
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = game.controller.mouse / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 1.0.26
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = game.controller.snes / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 1.0.43
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = inputstream.adaptive / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 21.5.16
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = metadata.album.universal / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 3.1.17
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = metadata.artists.universal / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 4.3.19
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = metadata.common.allmusic.com / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 3.2.2
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = metadata.common.fanart.tv / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 3.6.4
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = metadata.common.musicbrainz.org / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 2.2.4
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = metadata.common.theaudiodb.com / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 2.0.3
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = metadata.generic.albums / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 1.0.18
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = metadata.generic.artists / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 1.0.18
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = metadata.local / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 1.0.1
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = metadata.themoviedb.org.python / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 3.1.3
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = metadata.tvshows.themoviedb.org.python / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 1.7.4
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = peripheral.joystick / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 21.1.22
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = plugin.library.node.editor / Origin = repository.xbmc.org / Version = 2.0.5
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = plugin.service.favourites-sync / Origin =  / Version = 1.0.1
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = plugin.video.stream-cinema / Origin = repository.cder.sk / Version = 2.5.10.1+k19
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = repository.cder.sk / Origin = repository.cder.sk / Version = 1.0.4
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = repository.xbmc.org / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 3.4.0
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = resource.images.weathericons.default / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 1.1.9
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = resource.language.en_gb / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 2.0.2
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = resource.uisounds.kodi / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 1.0.1
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = screensaver.xbmc.builtin.black / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 1.0.34
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = screensaver.xbmc.builtin.dim / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 1.0.66
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = script.module.arrow / Origin = repository.xbmc.org / Version = 1.2.3
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = script.module.certifi / Origin = repository.xbmc.org / Version = 2023.5.7
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = script.module.chardet / Origin = repository.xbmc.org / Version = 5.1.0
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = script.module.dateutil / Origin = repository.xbmc.org / Version = 2.8.2
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = script.module.idna / Origin = repository.xbmc.org / Version = 3.10.0
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = script.module.inputstreamhelper / Origin = repository.xbmc.org / Version = 0.8.3
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = script.module.pil / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 5.1.0
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = script.module.pycryptodome / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 3.4.3
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = script.module.requests / Origin = repository.xbmc.org / Version = 2.31.0
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = script.module.six / Origin = repository.xbmc.org / Version = 1.16.0+matrix.1
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = script.module.trakt / Origin = repository.xbmc.org / Version = 4.4.0+matrix.1
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = script.module.typing_extensions / Origin = repository.xbmc.org / Version = 4.7.1
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = script.module.unidecode / Origin = repository.xbmc.org / Version = 1.3.6
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = script.module.urllib3 / Origin = repository.xbmc.org / Version = 2.2.3
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = script.module.websocket / Origin = repository.xbmc.org / Version = 1.6.4
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = service.upnext / Origin = repository.xbmc.org / Version = 1.1.9+matrix.1
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = service.xbmc.versioncheck / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 0.5.30+matrix.1
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = skin.estuary / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 4.0.0
+2025-10-25 12:46:33.506 T:82120   debug <general>: ADDON::CAddonRepos::DoAddonUpdateCheck: update check: addonID = webinterface.default / Origin = b6a50484-93a0-4afb-a01c-8d17e059feda / Version = 21.x-1.0.1
+2025-10-25 12:46:33.506 T:82120   debug <general>: CAddonMgr::GetAvailableUpdatesOrOutdatedAddons took 27 ms
+2025-10-25 12:46:33.508 T:82120   debug <general>: Thread waiting 82120 terminating
+2025-10-25 12:46:33.509 T:68752   debug <general>: Thread BackgroundLoader start, auto delete: false
+2025-10-25 12:46:33.509 T:64144   debug <general>: ------ Window Init (DialogNotification.xml) ------
+2025-10-25 12:46:33.509 T:68752   debug <general>: Thread BackgroundLoader 68752 terminating
+2025-10-25 12:46:33.510 T:64144   error <general>: ffmpeg[0x0]: [png] inflate returned error -3
+2025-10-25 12:46:33.510 T:64144   debug <general>: Error [-542398533] while decoding frame: Unknown error
+2025-10-25 12:46:33.510 T:64144   debug <general>: CTexture::LoadFromFileInternal - Load of C:\Users\stein\AppData\Roaming\Kodi\addons\plugin.service.favourites-sync\icon.png failed.
+2025-10-25 12:46:33.510 T:49556   debug <general>: CPythonInvoker::onExecutionDone(7, C:\Users\stein\AppData\Roaming\Kodi\addons\plugin.service.favourites-sync\resources\lib\service.py)
+2025-10-25 12:46:33.520 T:49556   debug <general>: Python interpreter stopped
+2025-10-25 12:46:33.520 T:49556   debug <general>: Thread LanguageInvoker 49556 terminating

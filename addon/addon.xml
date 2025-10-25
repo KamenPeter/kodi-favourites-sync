@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<addon id="plugin.service.favourites-sync"
+       name="Favourites Sync (Cloud)"
+       version="1.0.2"
+       provider-name="Kamen">
+  <requires>
+    <import addon="xbmc.python" version="3.0.0"/>
+  </requires>
+
+  <extension point="xbmc.service" library="resources/lib/service.py" start="startup" />
+
+  <extension point="xbmc.python.script" library="resources/lib/addon.py">
+    <provides>executable</provides>
+  </extension>
+
+  <extension point="xbmc.addon.metadata">
+    <summary lang="en_GB">Sync Kodi favourites to and from a cloud backend</summary>
+    <description lang="en_GB">Bidirectional cloud synchronization of favourites.xml with conflict detection, scheduled sync, and JSON-RPC control.</description>
+    <platform>all</platform>
+    <license>GPL-3.0</license>
+    <website></website>
+    <forum></forum>
+    <source></source>
+    <news></news>
+    <assets>
+      <icon>icon.png</icon>
+      <fanart>fanart.jpg</fanart>
+    </assets>
+    <provider-name>Kamen</provider-name>
+    <reuselanguageinvoker>true</reuselanguageinvoker>
+  </extension>
+</addon>
