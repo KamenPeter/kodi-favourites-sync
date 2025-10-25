@@ -14,12 +14,35 @@ except Exception:
     from logutil import log_info
 
 def main():
-    addon = xbmcaddon.Addon()
+    # Initialize addon with fallback for script context
+    try:
+        addon = xbmcaddon.Addon()
+    except RuntimeError:
+        addon = xbmcaddon.Addon("plugin.service.favourites-sync")
+    
     dialog = xbmcgui.Dialog()
     
     log_info("===== ADDON MAIN() CALLED - RUN BUTTON SHOULD BE ENABLED =====")
     log_info(f"addon.py main() - addon id: {addon.getAddonInfo('id')}")
     log_info(f"addon.py main() - addon version: {addon.getAddonInfo('version')}")
+    
+    # Log current configuration
+    try:
+        backend_idx = int(addon.getSetting("backend") or "0")
+        backend_names = ["WebDAV", "S3", "HTTP(S)", "SFTP", "SMB/NAS", "NFS", "Local Path"]
+        backend = backend_names[backend_idx]
+        log_info(f"addon.py main() - configured backend: {backend}")
+        
+        if backend == "WebDAV":
+            url = addon.getSetting("webdav_url") or ""
+            path = addon.getSetting("webdav_path") or ""
+            user = addon.getSetting("webdav_user") or ""
+            log_info(f"addon.py main() - WebDAV URL: {url}, Path: {path}, User: {user}")
+        elif backend == "Local Path":
+            path = addon.getSetting("local_path") or ""
+            log_info(f"addon.py main() - Local path: {path}")
+    except Exception as e:
+        log_info(f"addon.py main() - error reading config: {e}")
     
     # Always show menu - check configuration only when user tries to sync
     options = [

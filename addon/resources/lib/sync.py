@@ -31,7 +31,10 @@ STATUS_JSON = os.path.join(ADDON_DATA, "status.json")
 LOCK_FILE = os.path.join(ADDON_DATA, "sync.lock")
 
 
-def _hash(data: bytes) -> str:
+def _hash(data) -> str:
+    """Hash data (bytes or string) with SHA256"""
+    if isinstance(data, str):
+        data = data.encode('utf-8')
     return "sha256:" + hashlib.sha256(data or b"").hexdigest()
 
 
@@ -41,7 +44,11 @@ def _xbmcvfs_read(path) -> bytes:
             return b""
         f = xbmcvfs.File(path, 'rb')
         try:
-            return f.read()
+            data = f.read()
+            # Ensure we return bytes
+            if isinstance(data, str):
+                data = data.encode('utf-8')
+            return data
         finally:
             f.close()
     except Exception:
@@ -235,8 +242,16 @@ def _run(mode: str, dry_run: bool = False) -> dict:
                                                   local_mtime=os.path.getmtime(LOCAL_FAV) if os.path.exists(LOCAL_FAV) else 0.0,
                                                   remote_mtime=time.time())
         elif mode == "dryrun":
-            # preview bidirectional merge by default
-            merged_list, stats = xmlio.merge_sets(local_list, remote_list, prefer="newer",
+            # Preview bidirectional merge with conflict detection
+            if conflict:
+                prefer = "newer"
+                if cfg.get("conflict_policy") == "cloud":
+                    prefer = "cloud"
+                elif cfg.get("conflict_policy") == "local":
+                    prefer = "local"
+            else:
+                prefer = "newer"
+            merged_list, stats = xmlio.merge_sets(local_list, remote_list, prefer=prefer,
                                                   local_mtime=os.path.getmtime(LOCAL_FAV) if os.path.exists(LOCAL_FAV) else 0.0,
                                                   remote_mtime=time.time())
         else:
@@ -247,9 +262,19 @@ def _run(mode: str, dry_run: bool = False) -> dict:
         output_bytes = xmlio.serialize(xmlio.normalize(merged_list))
 
         if dry_run or mode == "dryrun":
-            status.update({"result": "dryrun", "changed_items": stats.get("added", 0) + stats.get("changed", 0)})
+            status.update({
+                "result": "dryrun", 
+                "changed_items": stats.get("added", 0) + stats.get("changed", 0) + stats.get("removed", 0),
+                "added": stats.get("added", 0),
+                "changed": stats.get("changed", 0),
+                "removed": stats.get("removed", 0),
+                "conflict_detected": conflict,
+                "added_items": stats.get("added_items", []),
+                "changed_items_list": stats.get("changed_items", []),
+                "removed_items": stats.get("removed_items", [])
+            })
             _save_status(status)
-            log_info(kvfmt(event="dry_run", added=stats.get("added", 0), changed=stats.get("changed", 0)))
+            log_info(kvfmt(event="dry_run", added=stats.get("added", 0), changed=stats.get("changed", 0), removed=stats.get("removed", 0), conflict=conflict))
             return status
 
         # Backups
@@ -272,6 +297,33 @@ def _run(mode: str, dry_run: bool = False) -> dict:
         if mode in ("pull", "bidirectional"):
             _xbmcvfs_write_atomic(LOCAL_FAV, output_bytes)
             changed += 1
+            
+            # Reload favourites in Kodi UI
+            # The trick: Navigate away from favorites and back to force reload
+            try:
+                # Get current window to detect if we're in favorites
+                current_window = xbmc.getInfoLabel('System.CurrentWindow')
+                log_info(f"Current window: {current_window}")
+                
+                # If in favorites window, refresh by navigating away and back
+                if 'favourite' in current_window.lower():
+                    # Navigate to home then back to favorites to force reload
+                    xbmc.executebuiltin('ActivateWindow(Home)')
+                    xbmc.sleep(100)  # Brief delay
+                    xbmc.executebuiltin('ActivateWindow(Favourites)')
+                    log_info("Favorites window reloaded")
+                else:
+                    # Just refresh container if we're elsewhere
+                    xbmc.executebuiltin('Container.Refresh')
+                    log_info("Container refreshed")
+                
+                # Notify user
+                xbmc.executebuiltin('Notification(Favourites Sync, Favourites updated successfully, 5000, DefaultIconInfo.png)')
+                log_info("Notification shown")
+                
+            except Exception as e:
+                log_error(kvfmt(event="reload_error", error=str(e)))
+                
         # Upload new content for push/bidirectional
         if mode in ("push", "bidirectional"):
             # Use remote etag for optimistic concurrency
@@ -308,7 +360,28 @@ def run_sync_ui(mode):
     m = mode
     if mode == "dryrun":
         res = _run("dryrun", dry_run=True)
-        d.ok(ADDON.getAddonInfo("name"), f"Dry-run: Added: {res.get('added', 0)} Changed: {res.get('changed', 0)}")
+        conflict_msg = " [CONFLICT DETECTED]" if res.get("conflict_detected") else ""
+        msg = f"Bidirectional Preview{conflict_msg}\n\n"
+        msg += f"Added: {res.get('added', 0)}\n"
+        if res.get('added_items'):
+            for item in res.get('added_items', [])[:5]:  # Show first 5
+                msg += f"  • {item}\n"
+            if len(res.get('added_items', [])) > 5:
+                msg += f"  ... and {len(res.get('added_items', [])) - 5} more\n"
+        msg += f"\nChanged: {res.get('changed', 0)}\n"
+        if res.get('changed_items_list'):
+            for item in res.get('changed_items_list', [])[:5]:
+                msg += f"  • {item}\n"
+            if len(res.get('changed_items_list', [])) > 5:
+                msg += f"  ... and {len(res.get('changed_items_list', [])) - 5} more\n"
+        msg += f"\nRemoved: {res.get('removed', 0)}\n"
+        if res.get('removed_items'):
+            for item in res.get('removed_items', [])[:5]:
+                msg += f"  • {item}\n"
+            if len(res.get('removed_items', [])) > 5:
+                msg += f"  ... and {len(res.get('removed_items', [])) - 5} more\n"
+        msg += f"\nTotal changes: {res.get('changed_items', 0)}"
+        d.ok(ADDON.getAddonInfo("name"), msg)
         return
     res = _run(m)
     if res.get("result") == "success":

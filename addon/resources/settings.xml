@@ -36,7 +36,7 @@
     <setting id="schedule_enabled" type="bool" label="Enable scheduled sync" default="false"/>
     <setting id="schedule_mode" type="enum" label="Schedule mode" values="Interval|Fixed time|On startup only" default="0"/>
     <setting id="interval_minutes" type="number" label="Interval (minutes)" default="60" visible="eq(-1,0)"/>
-    <setting id="fixed_time_local" type="time" label="Fixed time (local)" default="03:30" visible="eq(-2,1)"/>
+    <setting id="fixed_time_local" type="text" label="Fixed time (local HH:MM)" default="03:30" visible="eq(-2,1)"/>
     <setting id="run_on_startup" type="bool" label="Run on Kodi startup" default="false"/>
     <setting id="startup_delay_seconds" type="number" label="Startup delay (seconds)" default="20" visible="eq(-1,true)"/>
     <setting id="scheduled_mode" type="enum" label="Default scheduled sync mode" values="Pull (Cloud→Local)|Push (Local→Cloud)|Bidirectional" default="0"/>
@@ -47,7 +47,7 @@
   </category>
   <category id="backups" label="Backups">
     <setting id="local_backups" type="bool" label="Enable local backups" default="true"/>
-    <setting id="backup_count" type="number" label="Max local backups" default="5" range="1,20"/>
+    <setting id="backup_count" type="number" label="Max local backups (1-20)" default="5"/>
     <setting id="remote_backup_hint" type="lsep" label="If S3 versioning or WebDAV copy is available, remote history will be kept."/>
   </category>
   <category id="advanced" label="Advanced">

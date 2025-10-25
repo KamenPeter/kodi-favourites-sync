@@ -57,16 +57,16 @@ def normalize(favs: List[Favourite]) -> List[Favourite]:
 
 
 def merge_sets(local: List[Favourite], remote: List[Favourite], prefer: str = "newer",
-			   local_mtime: float = 0.0, remote_mtime: float = 0.0) -> Tuple[List[Favourite], Dict[str, int]]:
+			   local_mtime: float = 0.0, remote_mtime: float = 0.0) -> Tuple[List[Favourite], Dict[str, Any]]:
 	"""
 	Merge by key=(label,path). prefer can be:
 	  - "cloud"  → prefer remote on conflicts
 	  - "local"  → prefer local on conflicts
 	  - "newer"  → pick source with newer file mtime
 
-	Returns: (merged_list, stats={'added':int,'changed':int,'removed':int})
+	Returns: (merged_list, stats={'added':int,'changed':int,'removed':int, 'added_items':list, 'changed_items':list, 'removed_items':list})
 	"""
-	stats = {"added": 0, "changed": 0, "removed": 0}
+	stats = {"added": 0, "changed": 0, "removed": 0, "added_items": [], "changed_items": [], "removed_items": []}
 	idx_local = {f.key: f for f in local}
 	idx_remote = {f.key: f for f in remote}
 	keys = list(dict.fromkeys([*idx_local.keys(), *idx_remote.keys()]).keys())  # stable union
@@ -84,15 +84,18 @@ def merge_sets(local: List[Favourite], remote: List[Favourite], prefer: str = "n
 				elif prefer == "newer":
 					chosen = r if remote_mtime >= local_mtime else l
 				stats["changed"] += 1
+				stats["changed_items"].append(k[0])  # label/name
 				merged.append(chosen)
 			else:
 				merged.append(l)  # identical
 		elif l and not r:
 			merged.append(l)
 			stats["added"] += 1
+			stats["added_items"].append(k[0])  # label/name
 		elif r and not l:
 			merged.append(r)
 			stats["added"] += 1
+			stats["added_items"].append(k[0])  # label/name
 	# Dedup and stable order by label/path
 	merged = normalize(merged)
 	return merged, stats
