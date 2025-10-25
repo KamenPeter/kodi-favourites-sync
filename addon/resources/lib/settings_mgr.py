@@ -10,7 +10,36 @@ def _get(id_, default=None):
     return ADDON.getSetting(id_) or default
 
 def is_endpoint_valid():
-    return ADDON.getSettingBool("endpoint_valid")
+    """Check if endpoint is configured by trying to validate it"""
+    # Check if basic settings are configured
+    backend_idx = int(ADDON.getSetting("backend") or "0")
+    backend = ["webdav", "s3", "http", "sftp", "smb", "nfs", "local"][backend_idx]
+    
+    if backend == "webdav":
+        url = ADDON.getSetting("webdav_url") or ""
+        if not url or not url.startswith("https://"):
+            return False
+    elif backend == "local":
+        path = ADDON.getSetting("local_path") or ""
+        if not path:
+            return False
+    else:
+        # Other backends not implemented yet
+        return False
+    
+    # Settings look configured, now try a quick validation
+    try:
+        from sync import validate_endpoint
+        result = validate_endpoint()
+        return result.get("ok", False)
+    except Exception as e:
+        # Log the error but don't fail
+        try:
+            from logutil import log_error, kvfmt
+            log_error(kvfmt(event="endpoint_check_failed", error=str(e)))
+        except Exception:
+            pass
+        return False
 
 def open_settings(category_id=None):
     if category_id:

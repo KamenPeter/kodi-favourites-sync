@@ -150,17 +150,23 @@ def _backend_from_settings(cfg: dict):
     raise IOError("Selected backend not implemented")
 
 
-def validate_endpoint() -> dict:
+def validate_endpoint(addon_instance=None) -> dict:
+    """Validate endpoint connection.
+    
+    Args:
+        addon_instance: Optional addon instance (unused, kept for compatibility)
+    
+    Returns:
+        dict with "ok" (bool) and either "details" or "error"
+    """
     cfg = _settings_dict()
     try:
         b = _backend_from_settings(cfg)
         st = b.stat()
-        ADDON.setSettingBool("endpoint_valid", True)
         msg = kvfmt(event="validate_ok", backend=cfg.get("backend"), etag=st.get("etag", ""), size=st.get("size", 0))
         log_info(msg)
         return {"ok": True, "details": st}
     except Exception as e:
-        ADDON.setSettingBool("endpoint_valid", False)
         log_error(kvfmt(event="validate_failed", backend=cfg.get("backend"), error=str(e)))
         return {"ok": False, "error": str(e)}
 
@@ -186,7 +192,7 @@ def _release_lock():
 
 def _run(mode: str, dry_run: bool = False) -> dict:
     status = {"last_run": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-              "last_mode": mode, "result": "error", "changed_items": 0, "endpoint_valid": ADDON.getSettingBool("endpoint_valid"), "error": None}
+              "last_mode": mode, "result": "error", "changed_items": 0, "error": None}
     if not _acquire_lock():
         status["error"] = "Another sync is running"
         _save_status(status)
@@ -282,7 +288,6 @@ def _run(mode: str, dry_run: bool = False) -> dict:
             "changed_items": changed if changed else (stats.get("added", 0) + stats.get("changed", 0)),
             "last_synced_hash": _hash(_xbmcvfs_read(LOCAL_FAV)),
             "remote_hash": remote_hash,
-            "endpoint_valid": True,
             "error": None,
         })
         _save_status(status)

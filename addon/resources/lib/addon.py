@@ -16,11 +16,12 @@ except Exception:
 def main():
     addon = xbmcaddon.Addon()
     dialog = xbmcgui.Dialog()
-    if not is_endpoint_valid():
-        dialog.ok(addon.getAddonInfo("name"),
-                  "Cloud favourites location is not configured.\nOpen Settings → Cloud Location to set it up.")
-        open_settings(category_id="cloud")
-        return
+    
+    log_info("===== ADDON MAIN() CALLED - RUN BUTTON SHOULD BE ENABLED =====")
+    log_info(f"addon.py main() - addon id: {addon.getAddonInfo('id')}")
+    log_info(f"addon.py main() - addon version: {addon.getAddonInfo('version')}")
+    
+    # Always show menu - check configuration only when user tries to sync
     options = [
         "Pull (Cloud → Local)",
         "Push (Local → Cloud)",
@@ -31,9 +32,28 @@ def main():
         "Add to Favourites",
         "Settings",
     ]
+    
+    log_info("addon.py main() - showing menu dialog")
     choice = dialog.select("Favourites Sync", options)
+    log_info(f"addon.py main() - user selected option: {choice}")
+    
     if choice == -1:
+        log_info("addon.py main() - user cancelled menu")
         return
+    
+    # Check if endpoint is valid only when user tries to sync
+    if choice in (0, 1, 2, 3):  # Pull, Push, Bidirectional, Dry-run
+        log_info(f"addon.py main() - validating endpoint for sync operation {choice}")
+        is_valid = is_endpoint_valid()
+        log_info(f"addon.py main() - endpoint validation result: {is_valid}")
+        
+        if not is_valid:
+            log_info("addon.py main() - endpoint not valid, showing configuration dialog")
+            dialog.ok(addon.getAddonInfo("name"),
+                      "Cloud favourites location is not configured or unreachable.\n\nPlease go to Settings → Cloud Location to configure it.")
+            open_settings(category_id="cloud")
+            return
+    
     if choice == 0:
         run_sync_ui("pull")
     elif choice == 1:

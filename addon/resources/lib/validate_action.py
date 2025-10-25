@@ -21,7 +21,8 @@ def main():
         # Import after addon is initialized
         from sync import validate_endpoint
         
-        result = validate_endpoint()
+        # Just validate and show result - don't save anything
+        result = validate_endpoint(addon)
         if result.get("ok"):
             dialog.notification("Favourites Sync", "Endpoint validated successfully!", xbmcgui.NOTIFICATION_INFO, 3000)
         else:

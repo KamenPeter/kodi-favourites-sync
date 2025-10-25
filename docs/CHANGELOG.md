@@ -1,5 +1,68 @@
 # Changelog
 
+## 1.0.17 (2025-10-26)
+
+**DEBUGGING AND FIX:**
+- Changed: Extension point from xbmc.python.script to xbmc.python.pluginsource (may fix RUN button)
+- Added: TEST button in settings to manually trigger addon menu (test if RUN button issue is Kodi-side)
+- Added: Comprehensive debug logging in addon.py main() to trace execution
+- Added: Logging shows when addon is called, menu displayed, choices made, validation results
+- Debug: Every step now logged to help identify why RUN button stays disabled
+
+## 1.0.16 (2025-10-26)
+
+**MAJOR UX IMPROVEMENT:**
+- Changed: RUN button now ALWAYS enabled - no more blocking the UI
+- Changed: Menu shows immediately when addon is opened
+- Changed: Configuration check only happens when user tries to sync (Pull/Push/Bidirectional/Dry-run)
+- Fixed: User can now access Settings, Restore, Status, and other features without validation
+- Improved: Better user experience - don't block access, handle gracefully when needed
+
+## 1.0.15 (2025-10-26)
+
+- Fixed: validate_endpoint() call in settings_mgr.py - removed non-existent save_result parameter
+- Added: Better error logging in is_endpoint_valid() to diagnose validation failures
+- Improved: Exception handling shows actual error message in logs for troubleshooting
+
+## 1.0.14 (2025-10-25)
+
+**BREAKING CHANGE - Complete redesign of validation approach:**
+- Removed: endpoint_valid hidden setting that was causing persistence issues
+- Changed: is_endpoint_valid() now validates on-demand every time it's called
+- Fixed: Validation now works correctly - checks settings and validates connection
+- Fixed: Settings window no longer closes unexpectedly
+- Fixed: RUN button now appears when endpoint is actually reachable
+- Simplified: No more trying to save validation state - just validate when needed
+- Reverted versions 1.0.10-1.0.13 which attempted to fix a fundamentally flawed approach
+
+## 1.0.13 (2025-10-25) - DEPRECATED
+
+- Fixed: Settings window closing unexpectedly after validation
+- Fixed: Removed auto-validation from onSettingsChanged() that was causing settings dialog to close
+- Added: On-demand validation when opening addon - automatically validates and enables RUN button
+- Changed: Validation workflow - validate button shows feedback, opening addon saves the validation result
+- Improved: User experience - settings stay open until user clicks OK
+
+## 1.0.12 (2025-10-25)
+
+- Added: Debug logging for endpoint_valid flag to diagnose persistence issues
+- Added: Logging in service.py onSettingsChanged() to track validation results
+- Added: Logging in addon.py to track endpoint validation checks
+
+## 1.0.11 (2025-10-25)
+
+- Fixed: Validation button now doesn't save endpoint_valid flag (only shows feedback)
+- Changed: Auto-validation moved to service.py onSettingsChanged() callback
+- Changed: endpoint_valid flag saved only when user clicks OK in settings
+- Added: save_result parameter to validate_endpoint() function for better control
+
+## 1.0.10 (2025-10-25)
+
+- Fixed: endpoint_valid setting not persisting after validation
+- Changed: validate_endpoint() now accepts optional addon_instance parameter
+- Fixed: validate_action.py now passes properly initialized addon instance to validation
+- Improved: Settings persistence by using same addon instance for reading and writing
+
 ## 1.0.9 (2025-10-25)
 
 - Added: Local Path backend driver - supports local files and Windows UNC paths (\\server\share)

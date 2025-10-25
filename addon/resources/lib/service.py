@@ -65,9 +65,13 @@ def run():
 
 
 class _Monitor(xbmc.Monitor):
+    def __init__(self):
+        super().__init__()
+        self._last_validate_time = 0
+    
     def onSettingsChanged(self):
-        # Don't auto-validate on every change to avoid infinite loops
-        # Validation should be triggered explicitly via the validate button
+        # Don't auto-validate here - it causes the settings dialog to close
+        # Validation will happen on-demand when user opens the addon
         pass
 
 if __name__ == "__main__":

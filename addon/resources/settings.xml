@@ -30,7 +30,7 @@
     <setting id="nfs_path" type="text" label="NFS Path (or mounted local path)" default="nfs://nas.local/export/kodi/favourites/{profile}/favourites.xml" visible="eq(-27,5)"/>
     <setting id="local_path" type="file" label="Local (synced) file path" default="" visible="eq(-28,6)"/>
     <setting id="validate_button" type="action" label="Validate endpoint" action="RunScript(special://home/addons/plugin.service.favourites-sync/resources/lib/validate_action.py)" option="close"/>
-    <setting id="endpoint_valid" type="bool" label="Endpoint validated" default="false" visible="false"/>
+    <setting id="test_button" type="action" label="TEST - Run addon menu" action="RunScript(special://home/addons/plugin.service.favourites-sync/resources/lib/addon.py)" option="close"/>
   </category>
   <category id="schedule" label="Scheduling">
     <setting id="schedule_enabled" type="bool" label="Enable scheduled sync" default="false"/>
