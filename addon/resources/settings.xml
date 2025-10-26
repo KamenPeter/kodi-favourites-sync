@@ -39,6 +39,7 @@
     <setting id="fixed_time_local" type="text" label="Fixed time (local HH:MM)" default="03:30" visible="eq(-2,1)"/>
     <setting id="run_on_startup" type="bool" label="Run on Kodi startup" default="false"/>
     <setting id="startup_delay_seconds" type="number" label="Startup delay (seconds)" default="20" visible="eq(-1,true)"/>
+    <setting id="run_on_shutdown" type="bool" label="Run on Kodi shutdown" default="false"/>
     <setting id="scheduled_mode" type="enum" label="Default scheduled sync mode" values="Pull (Cloud→Local)|Push (Local→Cloud)|Bidirectional" default="0"/>
   </category>
   <category id="conflict" label="Conflict Policy">

@@ -48,7 +48,23 @@ def run():
         log_error(kvfmt(event="rpc_start_failed", error=str(e)))
 
     cfg = schedule_config()
-    log_info(kvfmt(event="service_start", mode=cfg.mode, enabled=cfg.enabled))
+    log_info(kvfmt(event="service_start", mode=cfg.mode, enabled=cfg.enabled, startup=cfg.on_startup))
+    
+    # Startup sync (independent of schedule_enabled)
+    if cfg.on_startup and is_endpoint_valid():
+        log_info("Running startup sync...")
+        if not monitor.waitForAbort(cfg.startup_delay_seconds):
+            try:
+                from .sync import _run
+            except Exception:
+                from sync import _run
+            try:
+                _run(cfg.scheduled_mode)
+                log_info("Startup sync completed")
+            except Exception as e:
+                log_error(kvfmt(event="startup_sync_failed", error=str(e)))
+    
+    # Main service loop (for scheduled syncs)
     while not monitor.abortRequested():
         cfg = schedule_config()
         if not cfg.enabled:
@@ -61,6 +77,24 @@ def run():
                 break
             continue
         run_scheduled_once(cfg, monitor)
+    
+    # Shutdown sync if enabled
+    if addon.getSettingBool("run_on_shutdown") and is_endpoint_valid():
+        log_info("Running shutdown sync...")
+        try:
+            # Import sync function
+            try:
+                from .sync import _run
+            except Exception:
+                from sync import _run
+            
+            # Get scheduled mode for shutdown sync
+            cfg = schedule_config()
+            _run(cfg.scheduled_mode)
+            log_info("Shutdown sync completed")
+        except Exception as e:
+            log_error(kvfmt(event="shutdown_sync_failed", error=str(e)))
+    
     log_info("Service stopped")
 
 

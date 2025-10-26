@@ -321,29 +321,36 @@ def _run(mode: str, dry_run: bool = False) -> dict:
 
         # Write local atomically for pull/bidirectional
         if mode in ("pull", "bidirectional"):
-            _xbmcvfs_write_atomic(LOCAL_FAV, output_bytes)
-            changed += 1
+            # Check if content actually changed before writing
+            old_local_bytes = _xbmcvfs_read(LOCAL_FAV) if os.path.exists(LOCAL_FAV) else b""
+            content_changed = (output_bytes != old_local_bytes)
             
-            # Reload favourites in Kodi UI
-            # The ONLY reliable way to reload favorites without full restart is LoadProfile
-            try:
-                import json
+            if content_changed:
+                _xbmcvfs_write_atomic(LOCAL_FAV, output_bytes)
+                changed += 1
                 
-                # Get current profile name
-                current_profile = xbmc.getInfoLabel('System.ProfileName')
-                log_info(f"Current profile: {current_profile}")
-                
-                # Method 1: Use LoadProfile to reload current profile
-                # This forces Kodi to reload favourites.xml from disk
-                xbmc.executebuiltin(f'LoadProfile({current_profile})')
-                log_info(f"Profile reloaded: {current_profile}")
-                
-                # Method 2: Notify user
-                xbmc.executebuiltin('Notification(Favourites Sync, Favourites updated - profile reloaded, 5000, DefaultIconInfo.png)')
-                log_info("Notification shown")
-                
-            except Exception as e:
-                log_error(kvfmt(event="reload_error", error=str(e)))
+                # Reload favourites in Kodi UI ONLY if content changed
+                # The ONLY reliable way to reload favorites without full restart is LoadProfile
+                try:
+                    import json
+                    
+                    # Get current profile name
+                    current_profile = xbmc.getInfoLabel('System.ProfileName')
+                    log_info(f"Favourites changed, reloading profile: {current_profile}")
+                    
+                    # Use LoadProfile to reload current profile
+                    # This forces Kodi to reload favourites.xml from disk
+                    xbmc.executebuiltin(f'LoadProfile({current_profile})')
+                    log_info(f"Profile reloaded: {current_profile}")
+                    
+                    # Notify user
+                    xbmc.executebuiltin('Notification(Favourites Sync, Favourites updated - profile reloaded, 5000, DefaultIconInfo.png)')
+                    log_info("Notification shown")
+                    
+                except Exception as e:
+                    log_error(kvfmt(event="reload_error", error=str(e)))
+            else:
+                log_info("No changes to favourites, skipping profile reload")
                 
         # Upload new content for push/bidirectional
         if mode in ("push", "bidirectional"):
@@ -466,12 +473,8 @@ def run_scheduled_once(cfg, monitor: xbmc.Monitor):
             return False
         return monitor.waitForAbort(sec)
 
-    # Startup run
-    if cfg.on_startup:
-        if wait_seconds(cfg.startup_delay_seconds):
-            return
-        _run(cfg.scheduled_mode)
-        # Only once at startup; continue with rest of schedule
+    # Note: Startup sync is now handled in service.py before entering the loop
+    # This function only handles periodic schedules
 
     if cfg.mode == "interval":
         if wait_seconds(int(cfg.interval_minutes) * 60):
@@ -489,6 +492,7 @@ def run_scheduled_once(cfg, monitor: xbmc.Monitor):
             return
         _run(cfg.scheduled_mode)
     elif cfg.mode == "startup":
-        # already handled
-        return
+        # Startup-only mode - no periodic sync
+        # Just wait indefinitely
+        monitor.waitForAbort()
 

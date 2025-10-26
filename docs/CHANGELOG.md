@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.0.40 (2025-10-26)
+
+**CRITICAL PERFORMANCE FIX - Eliminates Excessive Kodi Refreshes:**
+- Fixed: **Profile reload now only happens when favorites actually change**
+- Problem: Previous versions called `LoadProfile()` on EVERY sync, even when nothing changed
+- Impact: If you had scheduled sync every 60 minutes, Kodi would reload profile every hour
+- Solution: Now compares old vs new favorites content before writing/reloading
+- Result: Dramatically reduces UI disruption from automatic syncs
+- Logs: Now shows "No changes to favourites, skipping profile reload" when sync is no-op
+
+**Why This Matters:**
+- Before: Sync every hour = Profile reload every hour (disruptive)
+- After: Sync every hour = Profile reload only when something actually changed
+- LoadProfile is expensive - it reloads entire profile, interrupts video playback briefly
+- This was the cause of frequent Kodi refreshes!
+
+## 1.0.39 (2025-10-26)
+
+**Startup and Shutdown Sync Improvements:**
+- Fixed: "Run on Kodi startup" now works independently of "Enable scheduled sync" setting
+- Added: "Run on Kodi shutdown" option in Scheduling settings
+- Changed: Startup sync executes before entering main service loop
+- Changed: Shutdown sync executes when Kodi closes (after service loop exits)
+- Improved: Both startup and shutdown sync use the configured "Default scheduled sync mode"
+- Benefit: Can now sync on startup/shutdown without enabling periodic scheduled syncs
+
+**How It Works:**
+- Startup: Waits for configured delay, then syncs (independent of schedule)
+- Shutdown: Syncs favorites to cloud when Kodi is closing
+- Both: Use "Default scheduled sync mode" (Pull/Push/Bidirectional)
+- Both: Only run if endpoint is validated
+
 ## 1.0.38 (2025-10-26)
 
 **Favorites List Ordering:**
