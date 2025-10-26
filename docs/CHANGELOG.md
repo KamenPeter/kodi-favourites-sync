@@ -1,5 +1,85 @@
 # Changelog
 
+## 1.0.37 (2025-10-26)
+
+**Icon Path Absolute Location:**
+- Fixed: Icon thumb now uses absolute path by translating `special://home` to real filesystem location
+- Uses `xbmcvfs.translatePath()` to resolve addon's actual installation directory
+- Example result: `C:\Users\stein\AppData\Roaming\Kodi\addons\plugin.service.favourites-sync\icon.png`
+- Ensures icon displays properly in Kodi favorites
+
+## 1.0.36 (2025-10-26)
+
+**Favorite Entry Thumb Fix:**
+- Fixed: Now always uses direct XML editing to add favorite (ensures thumb attribute is included)
+- Removed: JSON-RPC `Favourites.AddFavourite` method (doesn't support thumb parameter)
+- Impact: Thumb icon now properly appears when adding to favorites
+
+## 1.0.35 (2025-10-26)
+
+**Icon Path Format:**
+- Changed: Icon path now uses backslash format: `addons\plugin.service.favourites-sync\icon.png`
+- Simplified from `special://home/addons/.../icon.png` to standard relative path
+
+## 1.0.34 (2025-10-26)
+
+**Favorite Entry Fix:**
+- Fixed: Corrected RunScript syntax in favorite entry creation (was double-wrapped causing favorite to do nothing when clicked)
+- Changed: JSON-RPC method now passes script path without RunScript wrapper (Kodi adds it)
+- Changed: XML fallback method explicitly adds RunScript wrapper for proper format
+- Impact: "Favourites Sync (Cloud)" favorite now properly opens addon menu when clicked
+
+## 1.0.33 (2025-10-26)
+
+**UI and Logging Improvements:**
+- Added: Detailed per-item logging to log file - lists each added/changed/removed item individually
+- Format: "+ Item Name" for additions, "~ Item Name" for changes, "- Item Name" for removals
+- Improved: Favorite entry now includes icon.png for better visual recognition in Kodi UI
+- Fixed: Verified RunScript syntax for favorite link (executes addon.py directly)
+- Enhanced: More detailed log output makes troubleshooting and sync verification easier
+
+**Why This Matters:**
+- Previously: Only summary counts in log (e.g., "3 items changed")
+- Now: Each change logged individually with clear symbols (+/-/~)
+- Icon: Makes "Favourites Sync (Cloud)" entry visually distinguishable
+- Log example:
+  ```
+  Added items (2):
+    + New Movie Shortcut
+    + TV Series Link
+  Removed items (1):
+    - Old Radio Stream
+  ```
+
+## 1.0.32 (2025-10-26)
+
+**MAJOR: Three-Way Merge Implementation - Proper Deletion Handling!**
+- **BREAKING IMPROVEMENT**: Bidirectional sync now uses three-way merge with tombstone tracking
+- Fixed: Deletions are now properly handled - deleted favorites stay deleted!
+- Changed: Now compares local, remote, AND last-synced state to detect intentional deletions
+- Added: `last_synced_items` stored in status.json for tracking what was synced previously
+- Improved: Decision matrix handles all scenarios: local deletion, remote deletion, conflicts
+- Backward compatible: First sync after upgrade treats all items as new (no false deletions)
+- Added: Detailed sync results dialog after every sync (shows Added/Changed/Removed with item names)
+- Changed: Success notification replaced with detailed results dialog (like dry-run preview)
+
+**How Deletion Now Works:**
+```
+Before: Delete B locally → Bidirectional sync → B comes back from cloud ❌
+Now:    Delete B locally → Bidirectional sync → B deleted from cloud too ✅
+```
+
+**Three-Way Merge Logic:**
+- Last-synced: [A, B, C] + Local: [A, C] + Remote: [A, B, C] = Result: [A, C] (B deleted everywhere)
+- Last-synced: [A, B] + Local: [A, B, C] + Remote: [A, B] = Result: [A, B, C] (C added from local)
+- Last-synced: [A, B] + Local: [A, B] + Remote: [A, B, C] = Result: [A, B, C] (C added from remote)
+
+**Testing Recommended:**
+1. Sync to establish baseline with v1.0.32
+2. Delete a favorite locally
+3. Bidirectional sync
+4. Verify deletion propagated to cloud (check remote file or other devices)
+
 ## 1.0.31 (2025-10-26)
 
 **FAVORITES RELOAD - Final Solution!**

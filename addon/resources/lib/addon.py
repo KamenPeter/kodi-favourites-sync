@@ -129,55 +129,42 @@ def main():
         addon_id = addon.getAddonInfo('id')
         addon_name = addon.getAddonInfo('name')
         
-        # Build the favourite entry
-        favourite_cmd = f"RunScript(special://home/addons/{addon_id}/resources/lib/addon.py)"
+        # Build the favourite entry - just the script path
+        script_path = f"special://home/addons/{addon_id}/resources/lib/addon.py"
         
-        # Use JSON-RPC to add to favourites
-        json_query = {
-            "jsonrpc": "2.0",
-            "method": "Favourites.AddFavourite",
-            "params": {
-                "title": addon_name,
-                "type": "script",
-                "path": favourite_cmd
-            },
-            "id": 1
-        }
-        
+        # Manually edit favourites.xml to include thumb attribute
+        # (JSON-RPC doesn't support thumb parameter)
         try:
-            import json
-            result = xbmc.executeJSONRPC(json.dumps(json_query))
-            result_dict = json.loads(result)
+            import xbmcvfs
+            profile = xbmcvfs.translatePath("special://profile/")
+            fav_file = os.path.join(profile, "favourites.xml")
             
-            if "error" in result_dict:
-                # Fallback: manually edit favourites.xml
-                import xbmcvfs
-                profile = xbmcvfs.translatePath("special://profile/")
-                fav_file = os.path.join(profile, "favourites.xml")
-                
-                # Read existing favourites
-                if os.path.exists(fav_file):
-                    with open(fav_file, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                else:
-                    content = '<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>\n<favourites>\n</favourites>'
-                
-                # Check if already exists
-                if addon_name in content:
-                    dialog.notification("Add to Favourites", "Already in favourites!", xbmcgui.NOTIFICATION_INFO, 3000)
-                else:
-                    # Add new favourite before </favourites>
-                    new_fav = f'    <favourite name="{addon_name}">{favourite_cmd}</favourite>\n'
-                    content = content.replace('</favourites>', new_fav + '</favourites>')
-                    
-                    # Write atomically
-                    tmp = fav_file + ".tmp"
-                    with open(tmp, 'w', encoding='utf-8') as f:
-                        f.write(content)
-                    os.replace(tmp, fav_file)
-                    
-                    dialog.notification("Add to Favourites", "Added successfully!", xbmcgui.NOTIFICATION_INFO, 3000)
+            # Get absolute path to addon icon
+            addon_home = xbmcvfs.translatePath(f"special://home/addons/{addon_id}/")
+            addon_icon = os.path.join(addon_home, "icon.png")
+            
+            # Read existing favourites
+            if os.path.exists(fav_file):
+                with open(fav_file, 'r', encoding='utf-8') as f:
+                    content = f.read()
             else:
+                content = '<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>\n<favourites>\n</favourites>'
+            
+            # Check if already exists
+            if addon_name in content:
+                dialog.notification("Add to Favourites", "Already in favourites!", xbmcgui.NOTIFICATION_INFO, 3000)
+            else:
+                # Add new favourite before </favourites>
+                favourite_cmd = f"RunScript({script_path})"
+                new_fav = f'    <favourite name="{addon_name}" thumb="{addon_icon}">{favourite_cmd}</favourite>\n'
+                content = content.replace('</favourites>', new_fav + '</favourites>')
+                
+                # Write atomically
+                tmp = fav_file + ".tmp"
+                with open(tmp, 'w', encoding='utf-8') as f:
+                    f.write(content)
+                os.replace(tmp, fav_file)
+                
                 dialog.notification("Add to Favourites", "Added successfully!", xbmcgui.NOTIFICATION_INFO, 3000)
         except Exception as e:
             dialog.ok("Error", f"Failed to add to favourites:\n{str(e)}")

@@ -56,10 +56,12 @@ def normalize(favs: List[Favourite]) -> List[Favourite]:
 	return out
 
 
-def merge_sets(local: List[Favourite], remote: List[Favourite], prefer: str = "newer",
-			   local_mtime: float = 0.0, remote_mtime: float = 0.0) -> Tuple[List[Favourite], Dict[str, Any]]:
+def merge_sets(local: List[Favourite], remote: List[Favourite], last_synced: List[Favourite] = None,
+			   prefer: str = "newer", local_mtime: float = 0.0, remote_mtime: float = 0.0) -> Tuple[List[Favourite], Dict[str, Any]]:
 	"""
-	Merge by key=(label,path). prefer can be:
+	Three-way merge: local, remote, and last_synced states.
+	
+	prefer can be:
 	  - "cloud"  → prefer remote on conflicts
 	  - "local"  → prefer local on conflicts
 	  - "newer"  → pick source with newer file mtime
@@ -67,35 +69,88 @@ def merge_sets(local: List[Favourite], remote: List[Favourite], prefer: str = "n
 	Returns: (merged_list, stats={'added':int,'changed':int,'removed':int, 'added_items':list, 'changed_items':list, 'removed_items':list})
 	"""
 	stats = {"added": 0, "changed": 0, "removed": 0, "added_items": [], "changed_items": [], "removed_items": []}
+	
+	# Build indices for all three states
 	idx_local = {f.key: f for f in local}
 	idx_remote = {f.key: f for f in remote}
-	keys = list(dict.fromkeys([*idx_local.keys(), *idx_remote.keys()]).keys())  # stable union
+	idx_last = {f.key: f for f in (last_synced or [])}
+	
+	# Get union of ALL keys from all three sources
+	all_keys = set(idx_local.keys()) | set(idx_remote.keys()) | set(idx_last.keys())
 
 	merged: List[Favourite] = []
-	for k in keys:
-		l = idx_local.get(k)
-		r = idx_remote.get(k)
-		if l and r:
-			# If attribs differ, resolve by policy
-			if (l.attrib != r.attrib):
-				chosen = r
+	
+	for key in all_keys:
+		in_last = key in idx_last
+		in_local = key in idx_local
+		in_remote = key in idx_remote
+		
+		# Decision matrix for three-way merge
+		
+		if in_last and not in_local and in_remote:
+			# DELETION DETECTED: Item was synced before, deleted locally, still on remote
+			# Propagate the deletion (don't add to merged list)
+			stats["removed"] += 1
+			stats["removed_items"].append(key[0])  # label/name
+			continue
+		
+		if in_last and in_local and not in_remote:
+			# Remote deleted, local kept - keep local (will be pushed to remote)
+			merged.append(idx_local[key])
+			stats["added"] += 1
+			stats["added_items"].append(key[0])
+			continue
+		
+		if in_last and not in_local and not in_remote:
+			# Both deleted - nothing to do
+			continue
+		
+		if not in_last and in_local and in_remote:
+			# New item on both sides - resolve conflict
+			if (idx_local[key].attrib != idx_remote[key].attrib):
+				chosen = idx_remote[key]
 				if prefer == "local":
-					chosen = l
+					chosen = idx_local[key]
 				elif prefer == "newer":
-					chosen = r if remote_mtime >= local_mtime else l
+					chosen = idx_remote[key] if remote_mtime >= local_mtime else idx_local[key]
 				stats["changed"] += 1
-				stats["changed_items"].append(k[0])  # label/name
+				stats["changed_items"].append(key[0])
 				merged.append(chosen)
 			else:
-				merged.append(l)  # identical
-		elif l and not r:
-			merged.append(l)
+				merged.append(idx_local[key])  # identical
+			continue
+		
+		if not in_last and in_local and not in_remote:
+			# New item added locally
+			merged.append(idx_local[key])
 			stats["added"] += 1
-			stats["added_items"].append(k[0])  # label/name
-		elif r and not l:
-			merged.append(r)
+			stats["added_items"].append(key[0])
+			continue
+		
+		if not in_last and not in_local and in_remote:
+			# New item added remotely
+			merged.append(idx_remote[key])
 			stats["added"] += 1
-			stats["added_items"].append(k[0])  # label/name
+			stats["added_items"].append(key[0])
+			continue
+		
+		if in_last and in_local and in_remote:
+			# Item exists in all three - check for modifications
+			if (idx_local[key].attrib != idx_remote[key].attrib):
+				# Conflict: both modified
+				chosen = idx_remote[key]
+				if prefer == "local":
+					chosen = idx_local[key]
+				elif prefer == "newer":
+					chosen = idx_remote[key] if remote_mtime >= local_mtime else idx_local[key]
+				stats["changed"] += 1
+				stats["changed_items"].append(key[0])
+				merged.append(chosen)
+			else:
+				# No changes or identical
+				merged.append(idx_local[key])
+			continue
+	
 	# Dedup and stable order by label/path
 	merged = normalize(merged)
 	return merged, stats

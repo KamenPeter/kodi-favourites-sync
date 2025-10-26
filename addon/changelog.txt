@@ -1,2 +1,22 @@
+v1.0.37 (2025.10.26)
+- Fixed: Icon path now uses absolute path (translates special://home to real location)
+- Example: C:\Users\stein\AppData\Roaming\Kodi\addons\plugin.service.favourites-sync\icon.png
+
+v1.0.36 (2025.10.26)
+- Fixed: Now always uses XML method to add favorite (ensures thumb attribute is included)
+- Removed: JSON-RPC method (doesn't support thumb parameter)
+
+v1.0.35 (2025.10.26)
+- Changed icon path format to use backslashes: addons\plugin.service.favourites-sync\icon.png
+
+v1.0.34 (2025.10.26)
+- Fixed RunScript syntax in favorite entry (was double-wrapped, causing favorite to not work)
+- JSON-RPC now passes script path without wrapper; XML fallback adds wrapper explicitly
+
+v1.0.33 (2025.10.26)
+- Added detailed per-item logging to log file (lists each added/changed/removed item)
+- Added icon.png to favourite entry for better recognition
+- Fixed favourite link to properly execute addon (RunScript syntax)
+
 v1.0.0 (2025.10.25)
 - Initial skeleton

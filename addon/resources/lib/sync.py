@@ -85,6 +85,28 @@ def _load_status() -> dict:
         return {}
 
 
+def _load_last_synced_items() -> list:
+    """Load last synced items from status.json and convert to Favourite objects"""
+    status = _load_status()
+    last_synced_items = status.get("last_synced_items", [])
+    if not last_synced_items:
+        return []
+    
+    # Convert dict items back to Favourite objects
+    favourites = []
+    for item in last_synced_items:
+        try:
+            fav = xmlio.Favourite(
+                label=item.get("label", ""),
+                path=item.get("path", ""),
+                attrib=item.get("attrib", {})
+            )
+            favourites.append(fav)
+        except Exception:
+            continue
+    return favourites
+
+
 def _backup_local(max_count: int) -> str:
     ts = time.strftime("%Y%m%d-%H%M%S")
     name = f"favourites_{ts}.xml.bak"
@@ -220,6 +242,9 @@ def _run(mode: str, dry_run: bool = False) -> dict:
         local_hash = _hash(local_bytes)
         remote_hash = _hash(remote_bytes)
         conflict = (local_hash != last_hash and remote_hash != last_hash and mode == "bidirectional")
+        
+        # Load last synced items for three-way merge
+        last_synced_list = _load_last_synced_items()
 
         changed = 0
         output_bytes = None
@@ -238,11 +263,12 @@ def _run(mode: str, dry_run: bool = False) -> dict:
                 prefer = "cloud"
             elif cfg.get("conflict_policy") == "local":
                 prefer = "local"
-            merged_list, stats = xmlio.merge_sets(local_list, remote_list, prefer=prefer,
+            # Three-way merge with last_synced_list for proper deletion handling
+            merged_list, stats = xmlio.merge_sets(local_list, remote_list, last_synced_list, prefer=prefer,
                                                   local_mtime=os.path.getmtime(LOCAL_FAV) if os.path.exists(LOCAL_FAV) else 0.0,
                                                   remote_mtime=time.time())
         elif mode == "dryrun":
-            # Preview bidirectional merge with conflict detection
+            # Preview bidirectional merge with conflict detection and three-way merge
             if conflict:
                 prefer = "newer"
                 if cfg.get("conflict_policy") == "cloud":
@@ -251,7 +277,7 @@ def _run(mode: str, dry_run: bool = False) -> dict:
                     prefer = "local"
             else:
                 prefer = "newer"
-            merged_list, stats = xmlio.merge_sets(local_list, remote_list, prefer=prefer,
+            merged_list, stats = xmlio.merge_sets(local_list, remote_list, last_synced_list, prefer=prefer,
                                                   local_mtime=os.path.getmtime(LOCAL_FAV) if os.path.exists(LOCAL_FAV) else 0.0,
                                                   remote_mtime=time.time())
         else:
@@ -332,13 +358,39 @@ def _run(mode: str, dry_run: bool = False) -> dict:
 
         status.update({
             "result": "success",
-            "changed_items": changed if changed else (stats.get("added", 0) + stats.get("changed", 0)),
+            "changed_items": changed if changed else (stats.get("added", 0) + stats.get("changed", 0) + stats.get("removed", 0)),
+            "added": stats.get("added", 0),
+            "changed": stats.get("changed", 0),
+            "removed": stats.get("removed", 0),
+            "added_items": stats.get("added_items", []),
+            "changed_items_list": stats.get("changed_items", []),
+            "removed_items": stats.get("removed_items", []),
             "last_synced_hash": _hash(_xbmcvfs_read(LOCAL_FAV)),
             "remote_hash": remote_hash,
             "error": None,
+            # Save last synced items for three-way merge in next sync
+            "last_synced_items": [
+                {"label": f.label, "path": f.path, "attrib": f.attrib}
+                for f in merged_list
+            ] if merged_list else []
         })
         _save_status(status)
+        
+        # Log detailed changes (requirement #2 from 1.0.33)
         log_info(kvfmt(event="sync_success", mode=mode, changed=status["changed_items"]))
+        if stats.get("added_items"):
+            log_info(f"Added items ({len(stats.get('added_items', []))}):")
+            for item in stats.get("added_items", []):
+                log_info(f"  + {item}")
+        if stats.get("changed_items", []):
+            log_info(f"Changed items ({len(stats.get('changed_items', []))}):")
+            for item in stats.get("changed_items", []):
+                log_info(f"  ~ {item}")
+        if stats.get("removed_items"):
+            log_info(f"Removed items ({len(stats.get('removed_items', []))}):")
+            for item in stats.get("removed_items", []):
+                log_info(f"  - {item}")
+        
         return status
     except Exception as e:
         status["error"] = str(e)
@@ -380,7 +432,28 @@ def run_sync_ui(mode):
         return
     res = _run(m)
     if res.get("result") == "success":
-        d.notification("Favourites Sync", f"{mode.capitalize()} completed", xbmcgui.NOTIFICATION_INFO, 3000)
+        # Show detailed sync results (requirement #1)
+        msg = f"{mode.capitalize()} Sync Completed\n\n"
+        msg += f"Added: {res.get('added', 0)}\n"
+        if res.get('added_items'):
+            for item in res.get('added_items', [])[:5]:
+                msg += f"  • {item}\n"
+            if len(res.get('added_items', [])) > 5:
+                msg += f"  ... and {len(res.get('added_items', [])) - 5} more\n"
+        msg += f"\nChanged: {res.get('changed', 0)}\n"
+        if res.get('changed_items_list'):
+            for item in res.get('changed_items_list', [])[:5]:
+                msg += f"  • {item}\n"
+            if len(res.get('changed_items_list', [])) > 5:
+                msg += f"  ... and {len(res.get('changed_items_list', [])) - 5} more\n"
+        msg += f"\nRemoved: {res.get('removed', 0)}\n"
+        if res.get('removed_items'):
+            for item in res.get('removed_items', [])[:5]:
+                msg += f"  • {item}\n"
+            if len(res.get('removed_items', [])) > 5:
+                msg += f"  ... and {len(res.get('removed_items', [])) - 5} more\n"
+        msg += f"\nTotal changes: {res.get('changed_items', 0)}"
+        d.ok(ADDON.getAddonInfo("name"), msg)
     else:
         d.ok("Favourites Sync", f"Failed: {res.get('error')}")
 
