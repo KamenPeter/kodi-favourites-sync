@@ -1,3 +1,7 @@
+v1.0.38 (2025.10.26)
+- Changed: "Favourites Sync (Cloud)" now always appears as first item in favorites list
+- Improved: Ensures addon is easily accessible at top of favorites menu
+
 v1.0.37 (2025.10.26)
 - Fixed: Icon path now uses absolute path (translates special://home to real location)
 - Example: C:\Users\stein\AppData\Roaming\Kodi\addons\plugin.service.favourites-sync\icon.png

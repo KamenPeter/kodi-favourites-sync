@@ -39,8 +39,25 @@ def load_xml(data: bytes) -> List[Favourite]:
 
 def serialize(favs: List[Favourite]) -> bytes:
 	root = ET.Element("favourites")
+	
+	# Ensure "Favourites Sync (Cloud)" is always first
+	sync_addon = None
+	other_favs = []
+	
 	for f in favs:
+		if f.label == "Favourites Sync (Cloud)":
+			sync_addon = f
+		else:
+			other_favs.append(f)
+	
+	# Add sync addon first if it exists
+	if sync_addon:
+		root.append(sync_addon.to_element())
+	
+	# Then add all other favorites
+	for f in other_favs:
 		root.append(f.to_element())
+	
 	return ET.tostring(root, encoding="utf-8")
 
 

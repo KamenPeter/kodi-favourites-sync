@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.38 (2025-10-26)
+
+**Favorites List Ordering:**
+- Changed: "Favourites Sync (Cloud)" now always appears as first item in favorites list
+- Improved: Modified serialize() function to prioritize addon favorite at top
+- Benefit: Ensures quick access to sync functionality from favorites menu
+- Applies: Both when adding via "Add to Favourites" option and during sync operations
+
 ## 1.0.37 (2025-10-26)
 
 **Icon Path Absolute Location:**
