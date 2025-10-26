@@ -87,7 +87,10 @@ def main():
         run_sync_ui("dryrun")
     elif choice == 4:
         # restore from backup
-        from .sync import ADDON_DATA, _xbmcvfs_write_atomic
+        try:
+            from .sync import ADDON_DATA, _xbmcvfs_write_atomic
+        except ImportError:
+            from sync import ADDON_DATA, _xbmcvfs_write_atomic
         import xbmc, xbmcvfs
         profile = xbmcvfs.translatePath("special://profile/")
         fav = os.path.join(profile, "favourites.xml")
@@ -103,9 +106,20 @@ def main():
         with open(path, 'rb') as f:
             data = f.read()
         _xbmcvfs_write_atomic(fav, data)
-        dialog.notification("Restore", "Favourites restored", xbmcgui.NOTIFICATION_INFO, 3000)
+        
+        # Reload favourites after restore - use LoadProfile to force reload
+        try:
+            current_profile = xbmc.getInfoLabel('System.ProfileName')
+            xbmc.executebuiltin(f'LoadProfile({current_profile})')
+        except Exception:
+            pass
+        
+        dialog.notification("Restore", "Favourites restored - profile reloaded", xbmcgui.NOTIFICATION_INFO, 3000)
     elif choice == 5:
-        from .sync import _load_status
+        try:
+            from .sync import _load_status
+        except ImportError:
+            from sync import _load_status
         st = _load_status()
         msg = f"Last: {st.get('last_run','-')}\nResult: {st.get('result','-')}\nChanged: {st.get('changed_items',0)}"
         dialog.ok("Last Sync Status", msg)

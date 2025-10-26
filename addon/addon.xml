@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <addon id="plugin.service.favourites-sync"
        name="Favourites Sync (Cloud)"
-       version="1.0.29"
+       version="1.0.31"
        provider-name="Kamen">
   <requires>
     <import addon="xbmc.python" version="3.0.0"/>

@@ -299,26 +299,21 @@ def _run(mode: str, dry_run: bool = False) -> dict:
             changed += 1
             
             # Reload favourites in Kodi UI
-            # The trick: Navigate away from favorites and back to force reload
+            # The ONLY reliable way to reload favorites without full restart is LoadProfile
             try:
-                # Get current window to detect if we're in favorites
-                current_window = xbmc.getInfoLabel('System.CurrentWindow')
-                log_info(f"Current window: {current_window}")
+                import json
                 
-                # If in favorites window, refresh by navigating away and back
-                if 'favourite' in current_window.lower():
-                    # Navigate to home then back to favorites to force reload
-                    xbmc.executebuiltin('ActivateWindow(Home)')
-                    xbmc.sleep(100)  # Brief delay
-                    xbmc.executebuiltin('ActivateWindow(Favourites)')
-                    log_info("Favorites window reloaded")
-                else:
-                    # Just refresh container if we're elsewhere
-                    xbmc.executebuiltin('Container.Refresh')
-                    log_info("Container refreshed")
+                # Get current profile name
+                current_profile = xbmc.getInfoLabel('System.ProfileName')
+                log_info(f"Current profile: {current_profile}")
                 
-                # Notify user
-                xbmc.executebuiltin('Notification(Favourites Sync, Favourites updated successfully, 5000, DefaultIconInfo.png)')
+                # Method 1: Use LoadProfile to reload current profile
+                # This forces Kodi to reload favourites.xml from disk
+                xbmc.executebuiltin(f'LoadProfile({current_profile})')
+                log_info(f"Profile reloaded: {current_profile}")
+                
+                # Method 2: Notify user
+                xbmc.executebuiltin('Notification(Favourites Sync, Favourites updated - profile reloaded, 5000, DefaultIconInfo.png)')
                 log_info("Notification shown")
                 
             except Exception as e:

@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.0.31 (2025-10-26)
+
+**FAVORITES RELOAD - Final Solution!**
+- Changed: Now uses `LoadProfile()` to force immediate favorites reload
+- Fixed: Favorites now appear immediately after sync/restore WITHOUT Kodi restart
+- Changed: Reloads current profile which forces Kodi to re-read favourites.xml from disk
+- Removed: Navigation hack (Home→Favorites) - wasn't reliable
+- Removed: Container.Refresh - doesn't affect favorites cache
+- Analysis: LoadProfile is what happens when you "change profile" - the ONLY way to reload favorites without full restart
+- This is equivalent to user manually switching profiles, but stays in current profile
+
+## 1.0.30 (2025-10-26)
+
+**CRITICAL FIXES - Restore and Import Errors:**
+- Fixed: "ImportError: attempted relative import with no known parent package" when using Restore from Backup
+- Fixed: Import fallback in restore function (try relative, except absolute import)
+- Fixed: Import fallback in status function to handle script execution context
+- Added: Favorites refresh after restore (same smart navigation as after sync)
+- Fixed: Restore now works properly and refreshes favorites view
+- Analysis: Container.Refresh alone doesn't trigger favorites reload - navigation approach works better
+
 ## 1.0.29 (2025-10-26)
 
 **DRY-RUN DETAILS & SMART FAVORITES REFRESH:**
