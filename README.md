@@ -1,24 +1,67 @@
 # Kodi Favourites Sync (Cloud)
 
-Add-on ID: `plugin.service.favourites-sync`
+Add-on ID: `plugin.service.favourites-sync` (service) + `plugin.program.favourites-sync` (launcher)  
+Version: 1.0.47
 
-Synchronise the active profile's `favourites.xml` with a cloud or network location. Supports on-demand and scheduled sync, bidirectional merging, backups, and a WebDAV backend.
+Synchronise the active profile's `favourites.xml` with a cloud or network location. Supports on-demand and scheduled sync, bidirectional merging, backups, and multiple backend types (WebDAV, HTTP, S3, SFTP, SMB, NFS, Local).
 
 ## Features
 
-- Pull, Push, and Bidirectional merge (by label+path)
-- WebDAV backend (HTTPS, Basic/Bearer, ETag, COPY for backups)
-- Atomic writes and local backup rotation
-- Scheduler (interval, fixed time, on startup)
-- Local JSON-RPC for automation (127.0.0.1:8765)
-- Logs with redacted secrets written to addon_data/log.txt
+- **Pull, Push, and Bidirectional** merge (by label+path)
+- **Multiple Backends**: WebDAV, HTTP(S), S3, SFTP, SMB/NAS, NFS, Local Path
+- **Security**: HTTPS required, ETag support, redacted logs
+- **Scheduler**: Startup and/or shutdown triggers (no more interval/fixed time)
+- **Three-way merge**: Tracks last synced state for proper deletion detection
+- **Daily log rotation**: Configurable retention (1-30 days)
+- **Local JSON-RPC** for automation (127.0.0.1:8765)
+- **Two-addon architecture**: Service (background) + Launcher (RUN button)
 
 ## Quick install
 
-1. In Kodi, Settings → Add-ons → Install from zip
-2. Choose the built zip: `dist/plugin.service.favourites-sync-1.0.9.zip`
-3. Open the add-on's Settings → Cloud Location, configure WebDAV and press "Validate endpoint" (or simply close Settings to auto-validate)
-4. Run the add-on and choose a sync action
+### Full Installation (Recommended)
+
+1. **Service Addon** (background sync):
+   ```
+   Settings → Add-ons → Install from zip
+   Choose: dist/plugin.service.favourites-sync-1.0.47.zip
+   ```
+
+2. **Launcher Addon** (RUN button + manual sync):
+   ```
+   Settings → Add-ons → Install from zip
+   Choose: dist/plugin.program.favourites-sync-1.0.46.zip
+   ```
+
+3. **Configure**:
+   - Open service addon Settings → Cloud Location
+   - Configure your backend (WebDAV, Local, etc.)
+   - Press "Validate endpoint"
+   - Enable automatic sync and choose schedule mode
+
+4. **Access**:
+   - Go to **Programs** → **Favourites Sync Launcher**
+   - Or use RUN button in addon info
+   - Choose Pull/Push/Bidirectional sync
+
+### Background-Only Installation
+If you only want automatic scheduled syncs:
+- Install only `dist/plugin.service.favourites-sync-1.0.47.zip`
+
+## Architecture
+
+**Service Addon** (`plugin.service.favourites-sync`)
+- Background service for automatic scheduled syncs
+- Runs on Kodi startup and shutdown  
+- No user-facing UI (service-type addons can't have RUN buttons)
+- Configure via addon settings
+
+**Launcher Addon** (`plugin.program.favourites-sync`)
+- User interface for manual sync operations
+- Appears in Programs menu with working RUN button
+- Depends on service addon
+- Imports sync functions from service
+
+This two-addon design solves Kodi's limitation where service-type addons don't have enabled RUN buttons.
 
 ## OTA repository (optional)
 
@@ -37,9 +80,11 @@ python tools/build_repo.py
 
 Artifacts:
 
-- `dist/plugin.service.favourites-sync-1.0.9.zip`
+- `dist/plugin.service.favourites-sync-1.0.47.zip`
+- `dist/plugin.program.favourites-sync-1.0.46.zip`
 - `repo-root/addons.xml`, `repo-root/addons.xml.md5`
-- `repo-root/plugin.service.favourites-sync/plugin.service.favourites-sync-1.0.9.zip`
+- `repo-root/plugin.service.favourites-sync/plugin.service.favourites-sync-1.0.47.zip`
+- `repo-root/plugin.program.favourites-sync/plugin.program.favourites-sync-1.0.46.zip`
 - `repo-root/repository.kamen/repository.kamen-1.0.0.zip`
 
 ## Publish (OTA hosting)

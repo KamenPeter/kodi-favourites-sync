@@ -1,0 +1,5 @@
+[B]1.0.1[/B] (2025-10-27)
+- Initial release of launcher companion add-on
+- Provides RUN button entry in Programs category
+- Delegates to core Favourites Sync service add-on
+

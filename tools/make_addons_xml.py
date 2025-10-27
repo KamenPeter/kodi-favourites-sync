@@ -9,18 +9,20 @@ REPO_ROOT = ROOT / 'repo-root'
 # Scan repo-root/*/*.zip and embed addon.xml content for each zip
 addons = []
 
+SOURCE_MAP = {
+    'plugin.service.favourites-sync': ROOT / 'addon' / 'addon.xml',
+    'plugin.program.favourites-sync': ROOT / 'runner' / 'addon.xml',
+    'repository.kamen': ROOT / 'repository.kamen' / 'addon.xml',
+}
+
 for addon_dir in sorted(REPO_ROOT.iterdir()):
     if not addon_dir.is_dir():
         continue
     zips = sorted(addon_dir.glob('*.zip'))
     if not zips:
         continue
-    # Determine which source addon.xml to include
-    if addon_dir.name == 'plugin.service.favourites-sync':
-        src_addon_xml = ROOT / 'addon' / 'addon.xml'
-    elif addon_dir.name == 'repository.kamen':
-        src_addon_xml = ROOT / 'repository.kamen' / 'addon.xml'
-    else:
+    src_addon_xml = SOURCE_MAP.get(addon_dir.name)
+    if not src_addon_xml:
         continue
     if not src_addon_xml.exists():
         continue

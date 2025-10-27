@@ -1,4 +1,13 @@
+[B]1.0.47[/B] (2025-10-27)
+- ARCHITECTURAL CHANGE: Split into two addons for better UX
+- NEW: Separate launcher addon (plugin.program.favourites-sync) provides RUN button in Programs menu
+- Changed: Service addon (plugin.service.favourites-sync) now focuses solely on background sync
+- Improved: Launcher addon depends on service, ensuring both are installed together
+- Benefit: Users can now easily access sync menu via Programs → Favourites Sync Launcher
+- Note: Install both zips for full functionality, or just service for background-only operation
+
 [B]1.0.46[/B] (2025-10-27)
+- Added: Separate launcher add-on (plugin.program.favourites-sync) with RUN button support
 - CRITICAL FIX: Stopped infinite refresh loop - LoadProfile() was restarting service and triggering new syncs
 - Fixed: Scheduled syncs (startup/shutdown) no longer reload Kodi profile to prevent service restart loop
 - Fixed: Favorites UI now only refreshes when manually synced, not every few seconds

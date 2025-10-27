@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<addon id="plugin.program.favourites-sync"
+       name="Favourites Sync (Launcher)"
+       version="1.0.1"
+       provider-name="Kamen">
+  <requires>
+    <import addon="xbmc.python" version="3.0.0"/>
+    <import addon="plugin.service.favourites-sync" version="1.0.47"/>
+  </requires>
+
+  <extension point="xbmc.python.script" library="default.py">
+    <provides>executable</provides>
+  </extension>
+
+  <extension point="xbmc.addon.metadata">
+    <summary lang="en_GB">Launch the Favourites Sync menu on demand</summary>
+    <description lang="en_GB">Visible Programs entry that opens the Favourites Sync menu while the service continues to run in the background.</description>
+    <platform>all</platform>
+    <license>GPL-3.0</license>
+    <news></news>
+    <assets>
+      <icon>icon.png</icon>
+      <fanart>fanart.jpg</fanart>
+    </assets>
+    <reuselanguageinvoker>true</reuselanguageinvoker>
+  </extension>
+</addon>
+

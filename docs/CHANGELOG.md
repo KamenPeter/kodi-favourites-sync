@@ -1,5 +1,50 @@
 # Changelog
 
+## 1.0.47 (2025-10-27)
+
+**ARCHITECTURAL IMPROVEMENT: Two-Addon Solution**
+
+**Background:**
+- Service-type addons in Kodi don't have enabled RUN buttons (by design)
+- Previous attempts to add script.py entry points didn't work
+- Users needed a way to manually trigger sync from Kodi UI
+
+**Solution:**
+Created a companion launcher addon that solves the RUN button problem:
+
+**1. Service Addon** (`plugin.service.favourites-sync`)
+- Focused solely on background service functionality
+- Runs automatic scheduled syncs (startup/shutdown)
+- No user-facing UI entry points
+- Continues to work exactly as before
+
+**2. Launcher Addon** (`plugin.program.favourites-sync`) **NEW**
+- Appears in Kodi's **Programs** menu
+- Has functional RUN button in addon info
+- Provides user-facing sync menu (Pull/Push/Bidirectional)
+- Declares dependency on service addon (auto-installs if missing)
+- Imports sync functions from service addon
+
+**Installation:**
+- **Option A**: Install both zips for full functionality
+  - `plugin.service.favourites-sync-1.0.47.zip` (background service)
+  - `plugin.program.favourites-sync-1.0.46.zip` (launcher with RUN button)
+- **Option B**: Install only service for background-only operation
+
+**Benefits:**
+- ✅ RUN button now works in Programs → Favourites Sync Launcher
+- ✅ Clean separation of concerns (service vs user interface)
+- ✅ Service addon remains lightweight
+- ✅ Launcher addon provides excellent UX
+- ✅ Follows Kodi addon best practices
+
+**User Experience:**
+1. Install both addons
+2. Go to **Programs** → **Favourites Sync Launcher**
+3. Click RUN or open it directly
+4. Choose Pull/Push/Bidirectional sync
+5. Background service continues to run scheduled syncs automatically
+
 ## 1.0.46 (2025-10-27)
 
 **CRITICAL BUG FIX: Infinite Refresh Loop**
@@ -41,6 +86,11 @@
 **Trade-off:**
 - **Before**: Favorites always visible immediately, but constant UI refreshing
 - **After**: Stable UI, but scheduled sync changes require restart to see
+
+**Packaging Update:**
+- Introduced separate launcher add-on `plugin.program.favourites-sync`
+- Service add-on now ships only the background service entry point
+- Launcher exposes RUN button in Programs and depends on the service package
 
 ## 1.0.45 (2025-10-27)
 

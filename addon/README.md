@@ -1,15 +1,54 @@
 # Kodi Favourites Sync (Cloud)
 
 Addon ID: `plugin.service.favourites-sync`  
-Version: 1.0.46
+Version: 1.0.47
 
 **Sync your Kodi favorites across multiple devices using cloud storage.**
 
 This addon automatically synchronizes your Kodi favorites (favourites.xml) to a cloud location, allowing you to maintain consistent favorites across all your Kodi installations. Whether you use WebDAV, local network storage, or cloud services like S3, your favorites stay in sync.
 
-## Features
+## Installation
 
-### Sync Modes
+### Full Installation (Recommended)
+Install both addons for complete functionality:
+
+1. **Service Addon** (background sync):
+   - Download `plugin.service.favourites-sync-1.0.47.zip`
+   - Kodi: **Settings** → **Add-ons** → **Install from zip file**
+   
+2. **Launcher Addon** (RUN button + manual sync):
+   - Download `plugin.program.favourites-sync-1.0.46.zip`
+   - Install the same way
+   - Depends on service addon (will install automatically if missing)
+
+### Background-Only Installation
+If you only want automatic scheduled syncs without manual control:
+- Install only `plugin.service.favourites-sync-1.0.47.zip`
+
+### Accessing the Addon
+- **Programs Menu**: Go to **Programs** → **Favourites Sync Launcher**
+- **Addon Info**: The launcher addon has a working RUN button
+- **Settings**: Configure via service addon settings
+
+## Two-Addon Architecture
+
+This addon uses a two-component design:
+
+**Service Addon** (`plugin.service.favourites-sync`)
+- Background service for automatic scheduled syncs
+- Runs on Kodi startup and shutdown
+- No user-facing UI (by design)
+- Configure via addon settings
+
+**Launcher Addon** (`plugin.program.favourites-sync`)  
+- User interface for manual sync operations
+- Appears in Programs menu with RUN button
+- Provides Pull/Push/Bidirectional sync options
+- Imports functionality from service addon
+
+This architecture solves the Kodi limitation where service-type addons don't have enabled RUN buttons.
+
+## Features
 - **Pull (Cloud→Local)**: Download favorites from cloud to your device
 - **Push (Local→Cloud)**: Upload your favorites to the cloud
 - **Bidirectional**: Three-way merge that intelligently combines changes from both sides
@@ -50,6 +89,7 @@ This addon automatically synchronizes your Kodi favorites (favourites.xml) to a 
 4. Configure cloud location in addon settings
 5. Click **Validate endpoint** to test connection
 6. Enable automatic sync and choose your schedule mode
+7. (Optional) Install the companion add-on plugin.program.favourites-sync to expose a RUN button under Programs
 
 ## Configuration
 
