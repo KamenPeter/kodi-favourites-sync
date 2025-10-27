@@ -8,10 +8,6 @@ try:
 except Exception:
     from settings_mgr import is_endpoint_valid, schedule_config
 try:
-    from .sync import run_scheduled_once, validate_endpoint
-except Exception:
-    from sync import run_scheduled_once, validate_endpoint
-try:
     from . import rpc
 except Exception:
     import rpc
@@ -48,12 +44,13 @@ def run():
         log_error(kvfmt(event="rpc_start_failed", error=str(e)))
 
     cfg = schedule_config()
-    log_info(kvfmt(event="service_start", mode=cfg.mode, enabled=cfg.enabled, startup=cfg.on_startup))
+    log_info(kvfmt(event="service_start", mode=cfg.mode, enabled=cfg.enabled, startup=cfg.on_startup, shutdown=cfg.on_shutdown))
     
-    # Startup sync (independent of schedule_enabled)
-    if cfg.on_startup and is_endpoint_valid():
-        log_info("Running startup sync...")
+    # Startup sync (runs if enabled, independent of schedule_enabled for periodic syncs)
+    if cfg.enabled and cfg.on_startup and is_endpoint_valid():
+        log_info(f"Waiting {cfg.startup_delay_seconds} seconds before startup sync...")
         if not monitor.waitForAbort(cfg.startup_delay_seconds):
+            log_info("Running startup sync...")
             try:
                 from .sync import _run
             except Exception:
@@ -63,23 +60,18 @@ def run():
                 log_info("Startup sync completed")
             except Exception as e:
                 log_error(kvfmt(event="startup_sync_failed", error=str(e)))
+        else:
+            log_info("Startup sync cancelled - Kodi is shutting down during startup delay")
     
-    # Main service loop (for scheduled syncs)
+    # Main service loop - just wait for shutdown now (no periodic syncs)
     while not monitor.abortRequested():
-        cfg = schedule_config()
-        if not cfg.enabled:
-            if monitor.waitForAbort(5):
-                break
-            continue
-        if not is_endpoint_valid():
-            log_info("Service: endpoint not validated; waiting…")
-            if monitor.waitForAbort(10):
-                break
-            continue
-        run_scheduled_once(cfg, monitor)
+        # Just wait, no periodic syncs
+        if monitor.waitForAbort(10):
+            break
     
     # Shutdown sync if enabled
-    if addon.getSettingBool("run_on_shutdown") and is_endpoint_valid():
+    cfg = schedule_config()
+    if cfg.enabled and cfg.on_shutdown and is_endpoint_valid():
         log_info("Running shutdown sync...")
         try:
             # Import sync function
@@ -88,12 +80,13 @@ def run():
             except Exception:
                 from sync import _run
             
-            # Get scheduled mode for shutdown sync
-            cfg = schedule_config()
-            _run(cfg.scheduled_mode)
-            log_info("Shutdown sync completed")
+            try:
+                _run(cfg.scheduled_mode)
+                log_info("Shutdown sync completed")
+            except Exception as e:
+                log_error(kvfmt(event="shutdown_sync_failed", error=str(e)))
         except Exception as e:
-            log_error(kvfmt(event="shutdown_sync_failed", error=str(e)))
+            log_error(kvfmt(event="shutdown_sync_import_failed", error=str(e)))
     
     log_info("Service stopped")
 

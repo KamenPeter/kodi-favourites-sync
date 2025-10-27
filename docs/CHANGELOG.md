@@ -1,5 +1,59 @@
 # Changelog
 
+## 1.0.43 (2025-10-27)
+
+**Startup Sync Improvements:**
+
+**Changes:**
+- Reduced default startup delay from 20 seconds to 5 seconds
+- Added clearer logging: "Waiting X seconds before startup sync..."
+- Added cancellation log: "Startup sync cancelled - Kodi is shutting down during startup delay"
+
+**Why:**
+- 20-second delay felt unresponsive - users couldn't tell if sync was working
+- 5-second delay is enough for Kodi to stabilize without feeling sluggish
+- Better logging makes it clear when startup sync is waiting vs running vs cancelled
+- If you close Kodi within the startup delay window, the sync is now explicitly cancelled with a log message
+
+**User Experience:**
+- Faster perceived sync on startup (5s vs 20s wait)
+- Clear feedback in logs about what's happening
+- Startup delay is still configurable in settings if you need longer
+
+## 1.0.42 (2025-10-27)
+
+**MAJOR: Simplified Scheduling - Removed Time-Based Syncs:**
+
+**What Changed:**
+- Removed: Interval-based sync (every X minutes)
+- Removed: Fixed time sync (daily at specific time)
+- Removed: Separate "Run on startup/shutdown" checkboxes
+- Simplified: Single "Enable automatic sync" checkbox
+- New modes: "On startup only", "On shutdown only", "On startup and shutdown"
+
+**Why This Makes Sense:**
+- Kodi isn't typically running 24/7
+- Time-based schedules are impractical (what if Kodi is off at scheduled time?)
+- Startup/shutdown sync is more logical: sync when you start using Kodi, sync changes when you close
+- Simpler settings = less confusion
+
+**New Settings Structure:**
+```
+Scheduling:
+  ☑ Enable automatic sync
+    Schedule mode: [On startup only ▾]
+                   [On shutdown only]
+                   [On startup and shutdown]
+    Startup delay (seconds): 20
+    Default sync mode: [Pull/Push/Bidirectional]
+```
+
+**Migration:**
+- Old "Enable scheduled sync" → "Enable automatic sync"
+- Old "Run on Kodi startup" → Schedule mode: "On startup only" or "On startup and shutdown"
+- Old "Run on Kodi shutdown" → Schedule mode: "On shutdown only" or "On startup and shutdown"
+- Interval/Fixed time settings removed
+
 ## 1.0.41 (2025-10-26)
 
 **All Backend Types Now Implemented:**

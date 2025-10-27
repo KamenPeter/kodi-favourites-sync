@@ -33,14 +33,10 @@
     <setting id="test_button" type="action" label="TEST - Run synchronization" action="RunScript(special://home/addons/plugin.service.favourites-sync/resources/lib/addon.py)" option="close"/>
   </category>
   <category id="schedule" label="Scheduling">
-    <setting id="schedule_enabled" type="bool" label="Enable scheduled sync" default="false"/>
-    <setting id="schedule_mode" type="enum" label="Schedule mode" values="Interval|Fixed time|On startup only" default="0"/>
-    <setting id="interval_minutes" type="number" label="Interval (minutes)" default="60" visible="eq(-1,0)"/>
-    <setting id="fixed_time_local" type="text" label="Fixed time (local HH:MM)" default="03:30" visible="eq(-2,1)"/>
-    <setting id="run_on_startup" type="bool" label="Run on Kodi startup" default="false"/>
-    <setting id="startup_delay_seconds" type="number" label="Startup delay (seconds)" default="20" visible="eq(-1,true)"/>
-    <setting id="run_on_shutdown" type="bool" label="Run on Kodi shutdown" default="false"/>
-    <setting id="scheduled_mode" type="enum" label="Default scheduled sync mode" values="Pull (Cloud→Local)|Push (Local→Cloud)|Bidirectional" default="0"/>
+    <setting id="schedule_enabled" type="bool" label="Enable automatic sync" default="false"/>
+    <setting id="schedule_mode" type="enum" label="Schedule mode" values="On startup only|On shutdown only|On startup and shutdown" default="0" visible="eq(-1,true)"/>
+    <setting id="startup_delay_seconds" type="number" label="Startup delay (seconds 2-40)" default="5" option="int" min="2" max="40" visible="substring(eq(-1,0),eq(-1,2))"/>
+    <setting id="scheduled_mode" type="enum" label="Default sync mode" values="Pull (Cloud→Local)|Push (Local→Cloud)|Bidirectional" default="0" visible="eq(-3,true)"/>
   </category>
   <category id="conflict" label="Conflict Policy">
     <setting id="conflict_policy" type="enum" label="Default policy for bidirectional" values="Prefer Cloud|Prefer Local|Bidirectional Merge|Manual Review" default="0"/>

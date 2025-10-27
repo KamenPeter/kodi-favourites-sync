@@ -93,23 +93,25 @@ def open_settings(category_id=None):
         _get_addon().openSettings()
 
 class ScheduleCfg:
-    def __init__(self, enabled, mode, interval, fixed_time, on_start, delay, scheduled_mode):
+    def __init__(self, enabled, mode, on_startup, on_shutdown, delay, scheduled_mode):
         self.enabled = enabled
         self.mode = mode
-        self.interval_minutes = interval
-        self.fixed_time_local = fixed_time
-        self.on_startup = on_start
+        self.on_startup = on_startup
+        self.on_shutdown = on_shutdown
         self.startup_delay_seconds = delay
         self.scheduled_mode = scheduled_mode
 
 def schedule_config():
     enabled = _get_addon().getSettingBool("schedule_enabled")
     mode_idx = int(_get_addon().getSetting("schedule_mode") or 0)
-    mode = ["interval", "fixed", "startup"][mode_idx]
-    interval = int(_get_addon().getSetting("interval_minutes") or 60)
-    fixed_time = _get_addon().getSetting("fixed_time_local") or "03:30"
-    on_start = _get_addon().getSettingBool("run_on_startup")
-    delay = int(_get_addon().getSetting("startup_delay_seconds") or 20)
+    mode = ["startup", "shutdown", "both"][mode_idx]
+    
+    # Determine startup and shutdown flags based on mode
+    on_startup = (mode == "startup" or mode == "both")
+    on_shutdown = (mode == "shutdown" or mode == "both")
+    
+    delay = int(_get_addon().getSetting("startup_delay_seconds") or 5)
     scheduled_mode_idx = int(_get_addon().getSetting("scheduled_mode") or 0)
     scheduled_mode = ["pull","push","bidirectional"][scheduled_mode_idx]
-    return ScheduleCfg(enabled, mode, interval, fixed_time, on_start, delay, scheduled_mode)
+    
+    return ScheduleCfg(enabled, mode, on_startup, on_shutdown, delay, scheduled_mode)

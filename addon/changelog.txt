@@ -1,3 +1,16 @@
+[B]1.0.43[/B] (2025-10-27)
+- Reduced default startup delay from 20 to 5 seconds for more responsive syncing
+- Added clearer logging when startup sync is cancelled due to quick Kodi shutdown
+- Improved startup sync logging to show delay duration
+
+[B]1.0.42[/B] (2025-10-27)
+- Changed: Simplified scheduling - removed time-based syncs (interval/fixed time)
+- Changed: Schedule modes now: "On startup only", "On shutdown only", "On startup and shutdown"
+- Removed: Interval minutes and fixed time settings (not practical when Kodi isn't always running)
+- Removed: Separate "Run on startup/shutdown" checkboxes (now part of schedule mode)
+- Simplified: "Enable automatic sync" checkbox with single mode dropdown
+- Improved: Cleaner, more logical scheduling interface
+
 v1.0.41 (2025.10.26)
 - Added: HTTP(S) backend driver (GET/PUT with auth header support)
 - Added: SMB/NAS backend driver (UNC paths: \\server\share\path)
