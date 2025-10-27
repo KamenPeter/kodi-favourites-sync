@@ -1,7 +1,10 @@
 [B]1.0.43[/B] (2025-10-27)
-- Reduced default startup delay from 20 to 5 seconds for more responsive syncing
-- Added clearer logging when startup sync is cancelled due to quick Kodi shutdown
-- Improved startup sync logging to show delay duration
+- Fixed: Startup delay setting now properly visible when "On startup only" or "On startup and shutdown" selected
+- Changed: Default startup delay reduced from 20 to 5 seconds for more responsive syncing
+- Improved: Startup delay is now user-configurable (range: 2-40 seconds) in addon settings
+- Added: Clearer logging - "Waiting X seconds before startup sync..."
+- Added: Cancellation logging - "Startup sync cancelled - Kodi is shutting down during startup delay"
+- Improved: Startup sync logging shows delay duration and cancellation status
 
 [B]1.0.42[/B] (2025-10-27)
 - Changed: Simplified scheduling - removed time-based syncs (interval/fixed time)
