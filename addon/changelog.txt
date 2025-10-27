@@ -1,3 +1,23 @@
+[B]1.0.46[/B] (2025-10-27)
+- CRITICAL FIX: Stopped infinite refresh loop - LoadProfile() was restarting service and triggering new syncs
+- Fixed: Scheduled syncs (startup/shutdown) no longer reload Kodi profile to prevent service restart loop
+- Fixed: Favorites UI now only refreshes when manually synced, not every few seconds
+- Improved: Added skip_profile_reload parameter to _run() for better control
+- Note: Manual syncs (from addon menu) still reload profile to show changes immediately
+- Result: Kodi UI remains stable, no more constant refreshing
+
+[B]1.0.45[/B] (2025-10-27)
+- Added: Daily log rotation - current log is log.txt, old logs are log_YYYY_MM_DD.txt
+- Added: Configurable log retention in Logging settings (1-30 days, default: 7)
+- Improved: Automatic cleanup of old log files based on retention setting
+- Improved: Log rotation happens automatically when writing logs (checks if date changed)
+- Note: Run button issue persists - service addons don't enable Run button by default in Kodi
+
+[B]1.0.44[/B] (2025-10-27)
+- Fixed: Run button now works - script.py directly calls addon.main() instead of circular RunAddon
+- Fixed: Removed circular call that prevented RUN button from being enabled in addon info
+- Improved: Added proper if __name__ == "__main__" guard for script entry point
+
 [B]1.0.43[/B] (2025-10-27)
 - Fixed: Startup delay setting now properly visible when "On startup only" or "On startup and shutdown" selected
 - Changed: Default startup delay reduced from 20 to 5 seconds for more responsive syncing

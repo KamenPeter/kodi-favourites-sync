@@ -1,5 +1,103 @@
 # Changelog
 
+## 1.0.46 (2025-10-27)
+
+**CRITICAL BUG FIX: Infinite Refresh Loop**
+
+**Problem Identified:**
+- Favorites UI was refreshing every 5-8 seconds continuously
+- Service was restarting repeatedly, triggering endless syncs
+- Root cause: `LoadProfile()` command restarts ALL service addons in Kodi
+
+**The Vicious Cycle:**
+1. Scheduled sync runs (startup/shutdown)
+2. Detects changes (even when none exist due to XML formatting)
+3. Calls `LoadProfile()` to refresh favorites
+4. Kodi restarts all services, including our sync service
+5. Service restart triggers new startup sync
+6. Repeat from step 2 → **INFINITE LOOP**
+
+**Solution:**
+- Added `skip_profile_reload` parameter to `_run()` function
+- Scheduled syncs (startup/shutdown) now pass `skip_profile_reload=True`
+- Manual syncs (from addon menu) still reload profile for immediate feedback
+- Files are still updated, but Kodi doesn't reload profile automatically
+- Users must restart Kodi or manually reload profile to see scheduled sync changes
+
+**Log Evidence:**
+```
+10:31:04 - Startup sync → "Favourites changed, reloading profile" → Service restarts
+10:31:04 - (immediate) Shutdown sync → "Favourites changed, reloading profile" → Service restarts
+10:31:13 - Startup sync again... (repeated every few seconds)
+```
+
+**Result:**
+- ✅ No more infinite loop
+- ✅ Kodi UI stays stable
+- ✅ Background syncs work without disruption
+- ⚠️ Scheduled sync changes require Kodi restart to be visible
+- ✅ Manual syncs still show changes immediately
+
+**Trade-off:**
+- **Before**: Favorites always visible immediately, but constant UI refreshing
+- **After**: Stable UI, but scheduled sync changes require restart to see
+
+## 1.0.45 (2025-10-27)
+
+**Daily Log Rotation:**
+
+**Feature:**
+- Logs now rotate daily automatically
+- Current log file: `log.txt`
+- Historical logs: `log_YYYY_MM_DD.txt` (e.g., `log_2025_10_26.txt`)
+- Rotation happens on first write after date change
+
+**Configuration:**
+- New setting in **Logging** category: "Log retention (days)"
+- Range: 1-30 days
+- Default: 7 days
+- Automatically deletes logs older than retention period
+
+**How it works:**
+1. When writing a log entry, system checks if current `log.txt` is from a previous day
+2. If yes, renames it to `log_YYYY_MM_DD.txt` based on its modification date
+3. If dated log already exists, merges content instead of replacing
+4. Scans for old log files and deletes those exceeding retention period
+5. Creates fresh `log.txt` for today
+
+**Benefits:**
+- Prevents log file from growing infinitely
+- Easy to find logs from specific dates
+- Automatic cleanup saves disk space
+- Configurable retention for troubleshooting needs
+
+**Run Button Issue:**
+- v1.0.44 fix did not resolve the issue
+- Investigation shows Kodi logs never attempt to execute script.py
+- Problem: Service-type addons don't enable Run button by default in Kodi
+- The addon is primarily registered as `xbmc.service` which prevents Run button
+- Need different approach: either make it primarily a plugin/script, or users must add favorite to run manually
+
+## 1.0.44 (2025-10-27)
+
+**Run Button Fix:**
+
+**Problem:**
+- RUN button was disabled/grayed out in Kodi addon info screen
+- script.py had circular call: `xbmc.executebuiltin('RunAddon(plugin.service.favourites-sync)')`
+- This caused the script to call itself infinitely, making Kodi disable the button
+
+**Solution:**
+- script.py now directly imports and calls `addon.main()` function
+- Added proper path setup to import from resources/lib
+- Added standard `if __name__ == "__main__"` entry point guard
+- Removed circular RunAddon call
+
+**Result:**
+- RUN button should now be enabled and functional
+- Clicking RUN shows the addon menu with Pull/Push/Bidirectional options
+- No more circular execution issues
+
 ## 1.0.43 (2025-10-27)
 
 **Startup Sync Improvements:**

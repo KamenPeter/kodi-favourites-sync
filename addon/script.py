@@ -3,14 +3,18 @@
 """
 Script entry point for the RUN button
 When user clicks RUN in addon info, this script is executed
-It simply launches the main addon menu
+It directly launches the main addon menu
 """
-import xbmc
-import xbmcaddon
+import sys
+import os
 
-# Get addon ID
-ADDON = xbmcaddon.Addon()
-ADDON_ID = ADDON.getAddonInfo('id')
+# Add resources/lib to path for imports
+addon_path = os.path.dirname(os.path.abspath(__file__))
+lib_path = os.path.join(addon_path, 'resources', 'lib')
+sys.path.insert(0, lib_path)
 
-# Launch the main addon
-xbmc.executebuiltin('RunAddon({})'.format(ADDON_ID))
+# Import and run the main addon function
+from addon import main
+
+if __name__ == "__main__":
+    main()

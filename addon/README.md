@@ -1,7 +1,7 @@
 # Kodi Favourites Sync (Cloud)
 
 Addon ID: `plugin.service.favourites-sync`  
-Version: 1.0.43
+Version: 1.0.46
 
 **Sync your Kodi favorites across multiple devices using cloud storage.**
 

@@ -256,14 +256,14 @@ def _release_lock():
         pass
 
 
-def _run(mode: str, dry_run: bool = False) -> dict:
+def _run(mode: str, dry_run: bool = False, skip_profile_reload: bool = False) -> dict:
     status = {"last_run": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
               "last_mode": mode, "result": "error", "changed_items": 0, "error": None}
     if not _acquire_lock():
         status["error"] = "Another sync is running"
         _save_status(status)
         return status
-    log_info(kvfmt(event="sync_start", mode=mode))
+    log_info(kvfmt(event="sync_start", mode=mode, skip_reload=skip_profile_reload))
     try:
         cfg = _settings_dict()
         backend = _backend_from_settings(cfg)
@@ -366,26 +366,29 @@ def _run(mode: str, dry_run: bool = False) -> dict:
                 _xbmcvfs_write_atomic(LOCAL_FAV, output_bytes)
                 changed += 1
                 
-                # Reload favourites in Kodi UI ONLY if content changed
-                # The ONLY reliable way to reload favorites without full restart is LoadProfile
-                try:
-                    import json
-                    
-                    # Get current profile name
-                    current_profile = xbmc.getInfoLabel('System.ProfileName')
-                    log_info(f"Favourites changed, reloading profile: {current_profile}")
-                    
-                    # Use LoadProfile to reload current profile
-                    # This forces Kodi to reload favourites.xml from disk
-                    xbmc.executebuiltin(f'LoadProfile({current_profile})')
-                    log_info(f"Profile reloaded: {current_profile}")
-                    
-                    # Notify user
-                    xbmc.executebuiltin('Notification(Favourites Sync, Favourites updated - profile reloaded, 5000, DefaultIconInfo.png)')
-                    log_info("Notification shown")
-                    
-                except Exception as e:
-                    log_error(kvfmt(event="reload_error", error=str(e)))
+                # Reload favourites in Kodi UI ONLY if content changed AND not skipped
+                # Skip reload during scheduled syncs to prevent infinite loop (LoadProfile restarts services)
+                if not skip_profile_reload:
+                    try:
+                        import json
+                        
+                        # Get current profile name
+                        current_profile = xbmc.getInfoLabel('System.ProfileName')
+                        log_info(f"Favourites changed, reloading profile: {current_profile}")
+                        
+                        # Use LoadProfile to reload current profile
+                        # This forces Kodi to reload favourites.xml from disk
+                        xbmc.executebuiltin(f'LoadProfile({current_profile})')
+                        log_info(f"Profile reloaded: {current_profile}")
+                        
+                        # Notify user
+                        xbmc.executebuiltin('Notification(Favourites Sync, Favourites updated - profile reloaded, 5000, DefaultIconInfo.png)')
+                        log_info("Notification shown")
+                        
+                    except Exception as e:
+                        log_error(kvfmt(event="reload_error", error=str(e)))
+                else:
+                    log_info("Favourites changed but profile reload skipped (scheduled sync)")
             else:
                 log_info("No changes to favourites, skipping profile reload")
                 

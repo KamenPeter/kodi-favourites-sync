@@ -54,6 +54,7 @@
   <category id="logging" label="Logging">
     <setting id="log_level" type="enum" label="Log level" values="INFO|DEBUG" default="0"/>
     <setting id="log_network" type="bool" label="Include network trace (redacted)" default="false"/>
+    <setting id="log_retention_days" type="number" label="Log retention (days)" default="7" option="int" min="1" max="30"/>
   </category>
   <category id="internal" label="Internal" visible="false">
     <setting id="first_run_done" type="bool" default="false" visible="false"/>

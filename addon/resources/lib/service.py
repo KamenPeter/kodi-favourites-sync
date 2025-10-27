@@ -56,7 +56,8 @@ def run():
             except Exception:
                 from sync import _run
             try:
-                _run(cfg.scheduled_mode)
+                # Skip profile reload for scheduled sync to prevent infinite loop
+                _run(cfg.scheduled_mode, skip_profile_reload=True)
                 log_info("Startup sync completed")
             except Exception as e:
                 log_error(kvfmt(event="startup_sync_failed", error=str(e)))
@@ -81,7 +82,8 @@ def run():
                 from sync import _run
             
             try:
-                _run(cfg.scheduled_mode)
+                # Skip profile reload for scheduled sync to prevent infinite loop
+                _run(cfg.scheduled_mode, skip_profile_reload=True)
                 log_info("Shutdown sync completed")
             except Exception as e:
                 log_error(kvfmt(event="shutdown_sync_failed", error=str(e)))
