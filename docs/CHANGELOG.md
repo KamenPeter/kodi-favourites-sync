@@ -1,5 +1,53 @@
 # Changelog
 
+## 1.0.41 (2025-10-26)
+
+**All Backend Types Now Implemented:**
+
+Added 5 new backend drivers:
+
+1. **HTTP(S) Backend** (`http.py`)
+   - Generic GET/PUT with optional authentication
+   - Supports Bearer token or Basic auth
+   - Requires HTTPS for security
+   - ETag support for concurrency control
+
+2. **SMB/NAS Backend** (`smb.py`)
+   - Windows UNC path support: `\\server\share\path`
+   - Works with mounted SMB shares
+   - Atomic writes with temp files
+   - Supports credentials (username/password)
+
+3. **NFS Backend** (`nfs.py`)
+   - Mounted NFS share support
+   - Unix/Linux filesystem paths
+   - Atomic writes with temp files
+   - Note: Direct nfs:// URLs not yet supported (mount required)
+
+4. **S3 Backend** (`s3.py`)
+   - AWS S3, MinIO, Wasabi, DigitalOcean Spaces
+   - Full S3 API support with boto3
+   - ETag/versioning support
+   - **Requires**: `pip install boto3`
+
+5. **SFTP Backend** (`sftp.py`)
+   - SSH file transfer protocol
+   - Key-based or password authentication
+   - Auto-creates remote directories
+   - **Requires**: `pip install paramiko`
+
+**Backend Status:**
+- ✅ **WebDAV** - Fully implemented (HTTPS, ETag, COPY)
+- ✅ **HTTP(S)** - Fully implemented (NEW)
+- ✅ **SMB/NAS** - Fully implemented (NEW)
+- ✅ **NFS** - Fully implemented (NEW)
+- ✅ **Local Path** - Fully implemented
+- ⚙️ **S3** - Implemented, requires boto3 library (NEW)
+- ⚙️ **SFTP** - Implemented, requires paramiko library (NEW)
+
+**Settings Updated:**
+- Note now shows: "Implemented: WebDAV, HTTP(S), SMB/NAS, NFS, Local Path. S3/SFTP require libraries."
+
 ## 1.0.40 (2025-10-26)
 
 **CRITICAL PERFORMANCE FIX - Eliminates Excessive Kodi Refreshes:**

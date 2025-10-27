@@ -1,4 +1,4 @@
-# SMB/NAS driver — treats UNC paths as local paths (works if share is accessible)
+# NFS driver — treats NFS paths as local mounted paths or NFS URLs
 import os
 import shutil
 import time
@@ -7,34 +7,31 @@ from typing import Dict
 
 class Driver:
     """
-    Driver for SMB/CIFS network shares via UNC paths
-    Relies on OS-level SMB mounting or Windows UNC path support
+    Driver for NFS network shares
+    Supports both mounted paths and nfs:// URLs (if accessible via OS)
     """
     
     def __init__(self, cfg: Dict[str, str]):
         """
         cfg should contain:
-        - 'smb_path': UNC path to the favourites.xml file
-          Example: \\\\NAS\\share\\kodi\\favourites\\favourites.xml
-        - 'smb_user': Optional username (for mounting)
-        - 'smb_password': Optional password (for mounting)
+        - 'nfs_path': Path to the favourites.xml file
+          Examples:
+            - Mounted: /mnt/nfs/kodi/favourites/favourites.xml
+            - NFS URL: nfs://nas.local/export/kodi/favourites/favourites.xml
         
-        Note: This driver assumes the SMB share is already accessible
-        (either mounted or accessible via UNC path on Windows)
+        Note: This driver assumes NFS share is already mounted or accessible
+        For nfs:// URLs, OS must support direct NFS access
         """
-        self.path = cfg.get("smb_path", "")
-        self.user = cfg.get("smb_user", "")
-        self.password = cfg.get("smb_password", "")
+        self.path = cfg.get("nfs_path", "")
         
         if not self.path:
-            raise IOError("SMB path not configured")
+            raise IOError("NFS path not configured")
         
-        # Normalize UNC path for Windows (convert forward slashes)
-        self.path = self.path.replace("/", "\\")
-        
-        # Ensure it's a valid UNC path format
-        if not (self.path.startswith("\\\\") or self.path.startswith("//")):
-            raise IOError("SMB path must be a UNC path (e.g., \\\\server\\share\\path)")
+        # Handle nfs:// URLs by converting to local path if possible
+        # This assumes Kodi has mounted NFS shares
+        if self.path.startswith("nfs://"):
+            # For now, treat as unsupported - would need nfs-client library
+            raise IOError("Direct nfs:// URLs not yet supported. Please mount NFS share and use local path")
         
         self.path = os.path.normpath(self.path)
     
@@ -60,12 +57,12 @@ class Driver:
                 "exists": True
             }
         except PermissionError:
-            raise IOError(f"Permission denied accessing SMB path {self.path} (check credentials)")
+            raise IOError(f"Permission denied accessing NFS path {self.path}")
         except Exception as e:
-            raise IOError(f"Cannot access SMB path {self.path}: {str(e)}")
+            raise IOError(f"Cannot access NFS path {self.path}: {str(e)}")
     
     def download(self) -> bytes:
-        """Read the file from SMB share"""
+        """Read the file from NFS share"""
         try:
             if not os.path.exists(self.path):
                 # Return empty favourites if file doesn't exist
@@ -74,12 +71,12 @@ class Driver:
             with open(self.path, 'rb') as f:
                 return f.read()
         except PermissionError:
-            raise IOError(f"Permission denied reading from SMB path {self.path}")
+            raise IOError(f"Permission denied reading from NFS path {self.path}")
         except Exception as e:
-            raise IOError(f"Cannot read from SMB path {self.path}: {str(e)}")
+            raise IOError(f"Cannot read from NFS path {self.path}: {str(e)}")
     
     def upload(self, data: bytes, metadata: dict = None) -> None:
-        """Write data to the SMB share atomically"""
+        """Write data to the NFS share atomically"""
         try:
             # Create parent directory if it doesn't exist
             parent = os.path.dirname(self.path)
@@ -104,7 +101,7 @@ class Driver:
                     os.remove(tmp_path)
                 except:
                     pass
-            raise IOError(f"Permission denied writing to SMB path {self.path}")
+            raise IOError(f"Permission denied writing to NFS path {self.path}")
         except Exception as e:
             # Clean up temp file if it exists
             tmp_path = self.path + ".tmp"
@@ -113,10 +110,10 @@ class Driver:
                     os.remove(tmp_path)
                 except:
                     pass
-            raise IOError(f"Cannot write to SMB path {self.path}: {str(e)}")
+            raise IOError(f"Cannot write to NFS path {self.path}: {str(e)}")
     
     def copy_backup(self, backup_name: str) -> None:
-        """Create a backup copy of the file on the SMB share"""
+        """Create a backup copy of the file on the NFS share"""
         try:
             if not os.path.exists(self.path):
                 return

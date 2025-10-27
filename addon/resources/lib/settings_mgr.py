@@ -29,12 +29,44 @@ def is_endpoint_valid():
         url = _get_addon().getSetting("webdav_url") or ""
         if not url or not url.startswith("https://"):
             return False
+    
     elif backend == "local":
         path = _get_addon().getSetting("local_path") or ""
         if not path:
             return False
+    
+    elif backend == "http":
+        get_url = _get_addon().getSetting("http_get") or ""
+        put_url = _get_addon().getSetting("http_put") or ""
+        if not get_url or not put_url:
+            return False
+    
+    elif backend == "s3":
+        endpoint = _get_addon().getSetting("s3_endpoint") or ""
+        bucket = _get_addon().getSetting("s3_bucket") or ""
+        key = _get_addon().getSetting("s3_key") or ""
+        access = _get_addon().getSetting("s3_access") or ""
+        if not endpoint or not bucket or not key or not access:
+            return False
+    
+    elif backend == "sftp":
+        host = _get_addon().getSetting("sftp_host") or ""
+        user = _get_addon().getSetting("sftp_user") or ""
+        path = _get_addon().getSetting("sftp_path") or ""
+        if not host or not user or not path:
+            return False
+    
+    elif backend == "smb":
+        path = _get_addon().getSetting("smb_path") or ""
+        if not path:
+            return False
+    
+    elif backend == "nfs":
+        path = _get_addon().getSetting("nfs_path") or ""
+        if not path:
+            return False
+    
     else:
-        # Other backends not implemented yet
         return False
     
     # Settings look configured, now try a quick validation

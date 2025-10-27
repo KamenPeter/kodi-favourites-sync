@@ -1,7 +1,7 @@
 <settings>
   <category id="cloud" label="Cloud Location (Required)">
     <setting id="backend" type="enum" label="Type" values="WebDAV|S3|HTTP(S)|SFTP|SMB/NAS|NFS|Local Path" default="0"/>
-    <setting id="backend_note" type="lsep" label="Note: WebDAV and Local Path are currently implemented"/>
+    <setting id="backend_note" type="lsep" label="Implemented: WebDAV, HTTP(S), SMB/NAS, NFS, Local Path. S3/SFTP require libraries."/>
     <setting id="webdav_url" type="text" label="WebDAV URL" default="" visible="eq(-2,0)"/>
     <setting id="webdav_path" type="text" label="Path to file" default="/kodi/favourites/{profile}/favourites.xml" visible="eq(-3,0)"/>
     <setting id="webdav_user" type="text" label="Username" default="" visible="eq(-4,0)"/>

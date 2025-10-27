@@ -1,3 +1,12 @@
+v1.0.41 (2025.10.26)
+- Added: HTTP(S) backend driver (GET/PUT with auth header support)
+- Added: SMB/NAS backend driver (UNC paths: \\server\share\path)
+- Added: NFS backend driver (mounted NFS paths)
+- Added: S3 backend driver (AWS/MinIO/Wasabi - requires boto3 library)
+- Added: SFTP backend driver (requires paramiko library)
+- Changed: All 7 backend types now implemented
+- Note: S3 and SFTP require additional Python libraries
+
 v1.0.40 (2025.10.26)
 - Fixed: Profile reload (LoadProfile) now only happens when favorites actually change
 - Performance: Eliminates unnecessary Kodi refreshes when sync finds no changes

@@ -163,20 +163,57 @@ def _settings_dict() -> dict:
 
 def _backend_from_settings(cfg: dict):
     backend = cfg.get("backend")
+    
     if backend == "webdav":
         try:
             from .drivers import webdav
         except Exception:
             from drivers import webdav
         return webdav.Driver(cfg)
+    
     elif backend == "local":
         try:
             from .drivers import local
         except Exception:
             from drivers import local
         return local.Driver(cfg)
-    # Other backends can be wired here later
-    raise IOError("Selected backend not implemented")
+    
+    elif backend == "http":
+        try:
+            from .drivers import http
+        except Exception:
+            from drivers import http
+        return http.Driver(cfg)
+    
+    elif backend == "s3":
+        try:
+            from .drivers import s3
+        except Exception:
+            from drivers import s3
+        return s3.Driver(cfg)
+    
+    elif backend == "sftp":
+        try:
+            from .drivers import sftp
+        except Exception:
+            from drivers import sftp
+        return sftp.Driver(cfg)
+    
+    elif backend == "smb":
+        try:
+            from .drivers import smb
+        except Exception:
+            from drivers import smb
+        return smb.Driver(cfg)
+    
+    elif backend == "nfs":
+        try:
+            from .drivers import nfs
+        except Exception:
+            from drivers import nfs
+        return nfs.Driver(cfg)
+    
+    raise IOError(f"Backend '{backend}' not recognized")
 
 
 def validate_endpoint(addon_instance=None) -> dict:
