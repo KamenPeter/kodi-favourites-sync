@@ -35,7 +35,7 @@
   <category id="schedule" label="Scheduling">
     <setting id="schedule_enabled" type="bool" label="Enable automatic sync" default="false"/>
     <setting id="schedule_mode" type="enum" label="Schedule mode" values="On startup only|On shutdown only|On startup and shutdown" default="0" visible="eq(-1,true)"/>
-    <setting id="startup_delay_seconds" type="number" label="Startup delay (seconds 2-40)" default="5" option="int" min="2" max="40" visible="substring(eq(-1,0),eq(-1,2))"/>
+    <setting id="startup_delay_seconds" type="number" label="Startup delay (seconds 2-40)" default="5" option="int" min="2" max="40" visible="[eq(-1,0) | eq(-1,2)] + eq(-2,true)"/>
     <setting id="scheduled_mode" type="enum" label="Default sync mode" values="Pull (Cloud→Local)|Push (Local→Cloud)|Bidirectional" default="0" visible="eq(-3,true)"/>
   </category>
   <category id="conflict" label="Conflict Policy">
