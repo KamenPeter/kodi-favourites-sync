@@ -118,8 +118,38 @@ def schedule_config():
 
 # Miscellaneous settings
 def misc_add_to_fav():
-    """Whether to add this addon to favourites"""
-    return _get_addon().getSettingBool("misc_add_to_fav")
+    """Whether to add this addon to favourites
+    
+    NOTE: This function reads directly from settings.xml to avoid Kodi's caching bug
+    where getSettingBool() returns stale values after UI toggles.
+    """
+    try:
+        import xbmcvfs
+        import xml.etree.ElementTree as ET
+        import os
+        
+        # Get path to settings.xml
+        addon_data = xbmcvfs.translatePath(_get_addon().getAddonInfo("profile"))
+        settings_path = os.path.join(addon_data, "settings.xml")
+        
+        # If settings file doesn't exist, return default
+        if not os.path.exists(settings_path):
+            return False
+        
+        # Parse XML and find misc_add_to_fav setting
+        tree = ET.parse(settings_path)
+        root = tree.getroot()
+        
+        for setting in root.findall('.//setting[@id="misc_add_to_fav"]'):
+            value = setting.text
+            if value:
+                return value.lower() == "true"
+        
+        # Not found, return default
+        return False
+    except Exception:
+        # Fall back to cached API if XML reading fails
+        return _get_addon().getSettingBool("misc_add_to_fav")
 
 def misc_set_add_to_fav(value: bool):
     """Set the misc_add_to_fav setting"""
@@ -139,7 +169,11 @@ def misc_sort_addons():
     return ["none", "az", "za", "manual"][sort_idx]
 
 def sync_misc_add_to_fav_state():
-    """Sync misc_add_to_fav setting with actual favourites.xml state"""
+    """Sync misc_add_to_fav setting with actual favourites.xml state
+    
+    NOTE: This should NOT be called after settings changes that trigger profile reload,
+    as it will overwrite the user's intended setting change.
+    """
     try:
         import xbmcvfs
         import os
@@ -149,6 +183,18 @@ def sync_misc_add_to_fav_state():
         except ImportError:
             from xmlio import parse_favourites_xml
             from reorder import SELF_ACTIONS
+        
+        # Check if there was a recent profile reload - if so, skip sync
+        # to avoid overwriting user's settings changes
+        addon_data = xbmcvfs.translatePath(_get_addon().getAddonInfo("profile"))
+        reload_flag_path = os.path.join(addon_data, ".profile_reload_flag")
+        if os.path.exists(reload_flag_path):
+            import time
+            mtime = os.path.getmtime(reload_flag_path)
+            age = time.time() - mtime
+            if age < 10:  # Within last 10 seconds
+                log_info(f"Skipping misc_add_to_fav sync - recent profile reload ({age:.1f}s ago)")
+                return
         
         profile_path = xbmcvfs.translatePath("special://profile")
         fav_path = os.path.join(profile_path, "favourites.xml")

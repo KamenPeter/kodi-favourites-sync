@@ -1,3 +1,13 @@
+[B]1.0.3[/B] (2025-10-28)
+- Added: Informational settings.xml to prevent "can't be configured" error
+- Improved: Settings now show instructions on how to configure the service addon
+- Note: This launcher has no actual settings - use RUN to open menu
+
+[B]1.0.2[/B] (2025-10-28)
+- Updated: Requires service addon v1.0.58 for smart dialog detection
+- Compatible: Works with all new auto-focus and delayed reload features
+- No code changes: Still uses same launcher interface
+
 [B]1.0.1[/B] (2025-10-27)
 - Initial release of launcher companion add-on
 - Provides RUN button entry in Programs category

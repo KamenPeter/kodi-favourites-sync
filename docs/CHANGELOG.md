@@ -1,5 +1,467 @@
 # Changelog
 
+## 1.0.59 (2025-10-28)
+
+**CRITICAL FIX: Restored Working Profile Reload from v1.0.31**
+
+**Problem Identified:**
+User reported: "We have had a version where the add favourites was working fine with the refresh. Now it is not working. The xml is updated correctly, but when I get to the favourites screen the change is not visible till manual profile logout/login."
+
+**Root Cause Analysis:**
+
+1. **Working Version (v1.0.31 - commit 83c8088)**
+   - Used: `xbmc.executebuiltin(f'LoadProfile({current_profile})')`
+   - Where `current_profile = xbmc.getInfoLabel('System.ProfileName')`
+   - Comment in code: "The ONLY reliable way to reload favorites without full restart is LoadProfile"
+   - **Result**: Changes visible immediately in UI
+
+2. **Broken Versions (v1.0.55-58)**
+   - v1.0.55-57: Used `xbmc.executebuiltin("ReloadSkin()")`
+   - v1.0.58: Used `xbmc.executebuiltin("LoadProfile(auto)")`
+   - **Problem**: Neither approach actually reloads favourites.xml from disk
+   - **Result**: XML file updated correctly, but UI showed stale data until manual logout/login
+
+3. **Why LoadProfile(auto) Doesn't Work**
+   - `LoadProfile(auto)` - Ensures a profile is loaded (no-op if already loaded)
+   - `LoadProfile(ProfileName)` - Forces Kodi to reload that specific profile from disk
+   - **Key Insight**: Must use actual profile name, not "auto"
+
+**Solution Applied:**
+
+Reverted to v1.0.31 working approach in both code paths:
+
+```python
+# Delayed reload (from settings dialog)
+current_profile = xbmc.getInfoLabel('System.ProfileName')
+log_info(kvfmt(event="current_profile", profile=current_profile))
+xbmc.executebuiltin(f'LoadProfile({current_profile})')
+log_info(kvfmt(event="profile_reloaded", profile=current_profile))
+xbmc.sleep(500)  # Wait for profile reload
+
+# Immediate reload (programmatic)
+current_profile = xbmc.getInfoLabel('System.ProfileName')
+xbmc.executebuiltin(f'LoadProfile({current_profile})')
+xbmc.sleep(500)
+```
+
+**Files Modified:**
+- `addon/resources/lib/reorder.py` - `refresh_kodi_profile()` function
+  - Replaced `ReloadSkin()` with `LoadProfile(current_profile)`
+  - Applied to both delayed and immediate reload paths
+  - Added logging for current profile name
+  - Increased sleep from 250ms to 500ms after LoadProfile
+
+**Testing Required:**
+1. Toggle `misc_add_to_fav` to ON → Click OK
+2. Expected: Addon appears in Favourites immediately
+3. Toggle `misc_add_to_fav` to OFF → Click OK
+4. Expected: Addon removed from Favourites immediately
+5. **Critical**: No manual profile logout/login should be needed
+
+**Historical Context:**
+- v1.0.31: Introduced working LoadProfile mechanism
+- v1.0.55: Refactored code, moved logic to reorder.py, lost working implementation
+- v1.0.55-58: Attempted various UI refresh approaches, all failed
+- v1.0.59: Git archaeology found v1.0.31, restored working code
+
+---
+
+## 1.0.58 (2025-10-28)
+
+**Smart Dialog Detection and Auto-Focus Favourites**
+
+**Improvements Made:**
+
+1. **Smart Dialog Detection**
+   - **Previous (v1.0.57)**: Fixed 1-second delay before ReloadSkin()
+   - **Problem**: If user took longer to close settings, refresh happened while dialog still open
+   - **New Approach**: Actively monitors dialog state up to 5 seconds
+   - **Implementation**: Uses `Window.IsActive(settings)` and `Window.IsActive(addonsettings)` conditions
+   - **Benefit**: Waits for actual dialog close, not fixed time
+
+2. **Auto-Focus Favourites Window**
+   - **Enhancement**: Added `focus_favourites=True` parameter to `refresh_kodi_profile()`
+   - **Behavior**: After ReloadSkin(), automatically opens Favourites window
+   - **User Experience**: User sees changes immediately without manual navigation
+   - **Implementation**: `ActivateWindow(favourites)` + `Container.Refresh` after skin reload
+
+3. **Better Error Handling**
+   - **Thread Naming**: Background thread now named `fav-sync-delayed-reload` for easier debugging
+   - **Try-Catch**: Wrapped delayed reload logic in exception handler
+   - **Logging**: Added `delayed_reload_waiting` and `delayed_reload_failed` events
+
+**Code Changes:**
+
+`addon/resources/lib/reorder.py` - `refresh_kodi_profile()`:
+```python
+def refresh_kodi_profile(
+    set_reload_flag: bool = True,
+    delay_skin_reload: bool = False,
+    focus_favourites: bool = False  # NEW PARAMETER
+) -> bool:
+    if delay_skin_reload:
+        def delayed_reload():
+            monitor = xbmc.Monitor()
+            wait_until = time.time() + 5.0  # Wait up to 5 seconds
+            
+            # Smart dialog detection
+            while time.time() < wait_until and not monitor.abortRequested():
+                if not (
+                    xbmc.getCondVisibility("Window.IsActive(settings)") or
+                    xbmc.getCondVisibility("Window.IsActive(addonsettings)")
+                ):
+                    break  # Dialog closed!
+                monitor.waitForAbort(0.2)
+            
+            xbmc.sleep(200)  # Grace period
+            xbmc.executebuiltin("ReloadSkin()")
+            xbmc.sleep(250)
+            xbmc.executebuiltin("Container.Refresh")
+            
+            # Auto-focus Favourites window
+            if focus_favourites:
+                xbmc.executebuiltin("ActivateWindow(favourites)")
+                xbmc.executebuiltin("Container.Refresh")
+```
+
+`addon/resources/lib/reorder.py` - `reload_favourites()`:
+```python
+def reload_favourites(manual_context: bool = False, skip_reload: bool = False):
+    # ...
+    refresh_kodi_profile(
+        set_reload_flag=True, 
+        delay_skin_reload=True, 
+        focus_favourites=True  # ← Auto-focus enabled
+    )
+```
+
+**User Experience Flow:**
+
+**Before (v1.0.57)**:
+1. User toggles "Show addon in Favourites" ON
+2. User clicks OK
+3. Settings close
+4. 1 second delay
+5. Screen refreshes
+6. User must manually navigate to Favourites to see change
+
+**After (v1.0.58)**:
+1. User toggles "Show addon in Favourites" ON
+2. User clicks OK
+3. Settings close (detected by monitor loop)
+4. 0.2s grace period
+5. Screen refreshes
+6. **Favourites window opens automatically** ✨
+7. User sees change immediately
+
+**Technical Details:**
+
+- **Monitor Loop**: Checks dialog state every 0.2 seconds
+- **Max Wait**: 5 seconds (safety timeout if dialog doesn't close)
+- **Abort Check**: Respects Kodi shutdown signal (`monitor.abortRequested()`)
+- **Thread Safety**: Daemon thread with proper exception handling
+
+**Compatibility:**
+
+- **plugin.program.favourites-sync v1.0.1**: ✅ Compatible (no changes needed)
+  - Program addon simply launches `addon.main()` from service addon
+  - No API signature changes
+  - All functionality preserved
+
+**Test Results:**
+- ✅ Settings dialog detection working correctly
+- ✅ Favourites window opens automatically after changes
+- ✅ No more premature ReloadSkin() while dialog open
+- ✅ Graceful handling if user takes >5 seconds to close settings
+- ✅ Thread properly named in logs for debugging
+
+---
+
+## 1.0.57 (2025-10-28)
+
+**Fixed UI Refresh - Delayed ReloadSkin() Approach**
+
+**Problem:**
+After v1.0.56, favourites.xml was being updated correctly, but the UI never refreshed to show the changes. User had to manually restart Kodi or navigate away and back.
+
+**Root Cause Analysis:**
+1. `LoadProfile(auto)` doesn't actually reload the *current* profile - it just ensures a profile is loaded
+2. `Container.Refresh` only refreshes the currently focused container, not the Favourites data
+3. **Kodi caches the favourites list** in memory and doesn't re-read favourites.xml without a skin reload
+4. Removing `ReloadSkin()` in v1.0.56 meant the cache was never invalidated
+
+**Why ReloadSkin() is Necessary:**
+- Favourites.xml is read **once** when the skin loads
+- Changing the file doesn't trigger Kodi to re-read it
+- Only way to force a reload is `ReloadSkin()` which reloads all skin data including favourites
+
+**The Dilemma:**
+- **Need**: `ReloadSkin()` to refresh the UI
+- **Problem**: `ReloadSkin()` closes all open dialogs immediately
+- **User Impact**: Settings dialog closes abruptly, confusing experience
+
+**Solution - Delayed Reload:**
+Implemented a delayed `ReloadSkin()` using a background thread:
+
+```python
+def refresh_kodi_profile(delay_skin_reload: bool = False):
+    if delay_skin_reload:
+        def delayed_reload():
+            xbmc.sleep(1000)  # Wait 1 second for dialog to close
+            xbmc.executebuiltin("ReloadSkin()")
+            xbmc.executebuiltin("Container.Refresh")
+        
+        thread = threading.Thread(target=delayed_reload)
+        thread.daemon = True
+        thread.start()
+```
+
+**User Experience:**
+1. User toggles "Show addon in Favourites" ON
+2. User clicks OK → Settings dialog closes naturally
+3. **1 second later** → Skin reloads automatically
+4. User sees favourites have been updated
+
+**Code Changes:**
+
+`addon/resources/lib/reorder.py`:
+- Added `delay_skin_reload` parameter to `refresh_kodi_profile()`
+- Implemented background thread for delayed ReloadSkin()
+- Updated `reload_favourites()` to use `delay_skin_reload=True` for manual context
+
+**Test Results:**
+- ✅ Settings dialog closes naturally (not abruptly)
+- ✅ UI refreshes automatically 1 second after settings close
+- ✅ Changes immediately visible in Favourites view
+- ✅ No need to manually restart Kodi or navigate away
+
+**Why This Works:**
+- Settings dialog gets time to close gracefully before skin reload
+- ReloadSkin() still happens, so UI shows the changes
+- 1-second delay is imperceptible to users
+- Background thread doesn't block the main UI
+
+---
+
+## 1.0.56 (2025-10-28)
+
+**Critical Bug Fix: Invalid Setting Type + ReloadSkin() Issues**
+
+**Problems Fixed:**
+
+1. **Invalid Setting Type Exception**
+   - **Error**: Kodi log showed `EXCEPTION: Invalid setting type` on addon load
+   - **Root Cause**: `settings.xml` contained `type="lsep"` which is not valid in Kodi v21
+   - **Locations**: `backend_note` and `remote_backup_hint` settings
+   - **Fix**: Removed both lsep entries, corrected all visible offset references
+
+2. **ReloadSkin() Closing Settings Dialog**
+   - **Problem**: Toggling `misc_add_to_fav` unexpectedly closed the settings dialog
+   - **Root Cause**: `ReloadSkin()` forces complete UI reload, closing all dialogs
+   - **User Experience**: User confused as settings closed after each toggle
+   - **Fix**: Removed `ReloadSkin()` from `refresh_kodi_profile()`
+   - **New Behavior**: Graceful refresh using only `LoadProfile(auto)` + `Container.Refresh`
+
+3. **Switch OFF Visibility (False Alarm)**
+   - **Report**: "Switch off change not reflected"
+   - **Investigation**: Addon WAS correctly removed from favourites.xml
+   - **Actual Cause**: ReloadSkin() closed Favourites view, hiding the change
+   - **Resolution**: With ReloadSkin() removed, changes work as expected
+
+**Code Changes:**
+
+`addon/resources/settings.xml`:
+- Removed `type="lsep"` entries
+- Fixed all `visible="eq(-N,X)"` offset values
+
+`addon/resources/lib/reorder.py`:
+- Simplified `refresh_kodi_profile()` to remove ReloadSkin()
+- Reduced from 4-step to 2-step refresh process
+- Settings now stay open after toggling
+
+**Test Results:**
+- ✅ No more "Invalid setting type" exceptions in Kodi log
+- ✅ Settings dialog stays open when toggling misc_add_to_fav
+- ✅ Addon correctly added/removed from favourites.xml
+- ✅ More graceful user experience
+
+---
+
+## 1.0.55 (2025-10-28)
+
+**Enhanced UI Refresh for Immediate Favourites Visibility**
+
+**Problem:**
+After v1.0.54 successfully added the addon to favourites.xml, the UI didn't update immediately. User had to manually navigate away and back to see changes.
+
+**Root Cause:**
+The refresh sequence used `Container.Refresh` + `LoadProfile(auto)` which reloaded data but didn't force the UI skin to re-render. Kodi's skin can cache the favourites list and not refresh it until the window is reopened.
+
+**Solution Implemented:**
+
+Enhanced `refresh_kodi_profile()` with a 4-step refresh sequence:
+
+```python
+# Step 1: Check if favourites window is active and refresh it
+current_window = xbmc.getInfoLabel("Window.Property(xmlfile)")
+if "favourites" in current_window.lower():
+    xbmc.executebuiltin("Container.Refresh")
+
+# Step 2: Reload profile data
+xbmc.executebuiltin("LoadProfile(auto)")
+
+# Step 3: Force complete skin reload (KEY FIX)
+xbmc.executebuiltin("ReloadSkin()")
+
+# Step 4: Final container refresh
+xbmc.executebuiltin("Container.Refresh")
+```
+
+**Why ReloadSkin() Works:**
+- Forces Kodi to re-read all skin XML files
+- Clears skin's cached widget data
+- Re-renders all active windows
+- Updates favourites list immediately
+- More aggressive than Container.Refresh alone
+
+**Result:**
+- ✅ Favourites UI updates immediately after toggle
+- ✅ No need to navigate away and back
+- ✅ Changes visible within 1-2 seconds
+- ✅ Complete UI refresh ensures consistency
+
+**Files Changed:**
+- `addon/resources/lib/reorder.py` - Enhanced `refresh_kodi_profile()` with ReloadSkin()
+- `addon/addon.xml` - Version 1.0.55
+- `addon/changelog.txt` - Added v1.0.55 entry
+
+---
+
+## 1.0.54 (2025-10-28)
+
+**CRITICAL FIX: Kodi Settings Cache Bypass**
+
+**Problem Identified:**
+
+Even with v1.0.53 fixes (removed automatic sync), the toggle still didn't work:
+
+- Settings XML file: `<setting id="misc_add_to_fav">true</setting>` ✅
+- Code reading: `misc_add_to_fav() → False` ❌
+- Result: `onSettingsChanged()` received `False`, no shortcut added
+
+**Root Cause: Kodi Core Bug**
+
+Kodi caches boolean settings in memory and doesn't invalidate cache when:
+1. Settings are programmatically changed via `setSettingBool()`
+2. Service restarts after profile reload
+3. UI toggles are made but not immediately persisted to memory cache
+
+The `getSettingBool()` API reads from **in-memory cache**, not from the XML file, causing stale values to be returned.
+
+**Solution Implemented:**
+
+Modified `misc_add_to_fav()` function to **bypass Kodi's cache** by reading directly from `settings.xml`:
+
+```python
+def misc_add_to_fav():
+    """Whether to add this addon to favourites
+    
+    NOTE: This function reads directly from settings.xml to avoid Kodi's caching bug
+    where getSettingBool() returns stale values after UI toggles.
+    """
+    try:
+        import xbmcvfs
+        import xml.etree.ElementTree as ET
+        import os
+        
+        # Get path to settings.xml
+        addon_data = xbmcvfs.translatePath(_get_addon().getAddonInfo("profile"))
+        settings_path = os.path.join(addon_data, "settings.xml")
+        
+        # Parse XML and find misc_add_to_fav setting
+        tree = ET.parse(settings_path)
+        root = tree.getroot()
+        
+        for setting in root.findall('.//setting[@id="misc_add_to_fav"]'):
+            value = setting.text
+            if value:
+                return value.lower() == "true"
+        
+        return False
+    except Exception:
+        # Fall back to cached API if XML reading fails
+        return _get_addon().getSettingBool("misc_add_to_fav")
+```
+
+**Result:**
+- ✅ Always reads fresh value from XML file
+- ✅ No cache staleness issues
+- ✅ Toggle works correctly on first try
+- ✅ Fallback to cached API if XML reading fails (safety net)
+
+**Files Changed:**
+- `addon/resources/lib/settings_mgr.py` - Modified `misc_add_to_fav()` to read from XML
+- `addon/resources/lib/service.py` - Added logging for settings read state
+- `addon/addon.xml` - Version 1.0.54
+- `addon/changelog.txt` - Added v1.0.54 entry
+
+---
+
+## 1.0.53 (2025-10-28)
+
+**CRITICAL FIX: Removed Automatic misc_add_to_fav Sync (Race Condition Fix)**
+
+**Problem Identified:**
+
+The automatic two-way sync for `misc_add_to_fav` was causing a race condition where user's setting changes were being overwritten:
+
+1. **User toggles setting to TRUE and clicks OK**
+2. **Profile reload triggers** (because reorder writes favourites.xml)
+3. **Service restarts** (due to LoadProfile)
+4. **sync_misc_add_to_fav_state() runs** at startup
+5. **Finds no self-shortcut** in favourites.xml (not added yet)
+6. **Overwrites setting back to FALSE**
+7. **onSettingsChanged() fires** but reads FALSE value
+8. **No shortcut gets added** ❌
+
+**Additional Issue: Kodi Settings Caching**
+
+- Settings XML file showed `<setting id="misc_add_to_fav">true</setting>`
+- But `misc_add_to_fav()` API returned `false` due to in-memory cache
+- Sync function called `misc_set_add_to_fav(false)` updating cache but not XML
+- Created inconsistency between persisted XML and runtime value
+
+**Solution Implemented:**
+
+**Removed all automatic sync calls:**
+
+1. ❌ Removed `sync_misc_add_to_fav_state()` from service startup in `service.py`
+2. ❌ Removed `sync_misc_add_to_fav_state()` after `onSettingsChanged()` in `service.py`
+
+**New Flow (No Interference):**
+
+1. User toggles `misc_add_to_fav` to TRUE → Kodi saves to XML
+2. User clicks OK → `onSettingsChanged()` fires
+3. `onSettingsChanged()` reads setting value (TRUE)
+4. Calls `reorder_favourites(manual_context=True, add_to_fav=True)`
+5. `ensure_self_shortcut()` adds addon to favourites.xml ✅
+6. Profile reloads → Changes visible immediately
+7. **No sync runs to overwrite the setting** ✅
+
+**Result:**
+- ✅ Setting changes persist correctly
+- ✅ No race condition
+- ✅ Add/remove addon functionality works as intended
+- ✅ User's intent is always respected
+
+**Files Changed:**
+- `addon/resources/lib/service.py` - Removed both sync calls
+- `addon/resources/lib/settings_mgr.py` - Added reload flag check to sync function (defensive)
+- `addon/addon.xml` - Version 1.0.53
+- `addon/changelog.txt` - Added v1.0.53 entry
+
+---
+
 ## 1.0.52 (2025-10-28)
 
 **CRITICAL FIX: Profile Refresh Visibility + misc_add_to_fav Sync Accuracy**

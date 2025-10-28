@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <addon id="plugin.service.favourites-sync"
        name="Favourites Sync (Cloud)"
-       version="1.0.52"
+       version="1.0.59"
        provider-name="Kamen">
   <requires>
     <import addon="xbmc.python" version="3.0.0"/>
@@ -15,7 +15,7 @@
     <platform>all</platform>
     <license>MIT</license>
     <source>https://github.com/KamenPeter/kodi-favourites-sync</source>
-    <news>v1.0.52: Fixed profile refresh to show changes immediately + fixed misc_add_to_fav sync on startup</news>
+    <news>v1.0.59: CRITICAL FIX - Restored working profile reload mechanism from v1.0.31, UI changes now visible immediately</news>
     <assets>
       <icon>icon.png</icon>
     </assets>

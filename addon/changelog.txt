@@ -1,3 +1,49 @@
+v1.0.59 (2025-10-28)
+- CRITICAL FIX: Restored working profile reload mechanism from v1.0.31
+- Fixed: UI changes now visible immediately - favourites.xml reloads properly
+- Root Cause: v1.0.55-58 used ReloadSkin() or LoadProfile(auto) which don't reload favourites
+- Solution: Reverted to LoadProfile(ProfileName) with actual profile name
+- Technical: LoadProfile(auto) doesn't reload current profile, must use actual profile name
+- Result: No more manual profile logout/login needed to see changes
+
+v1.0.58 (2025-10-28)
+- Improved: Smart dialog detection waits up to 5 seconds for settings dialog to close
+- Improved: Uses Window.IsActive conditions to detect when dialogs actually close
+- Enhanced: Added focus_favourites parameter to automatically open Favourites window after changes
+- Technical: Better thread naming and error handling in delayed reload
+- UX: Smoother experience - automatically shows Favourites after toggling addon visibility
+
+v1.0.57 (2025-10-28)
+- Fixed: UI refresh now actually works - added delayed ReloadSkin() using background thread
+- Improved: Settings dialog closes naturally, then skin reloads 1 second later to show changes
+- Technical: LoadProfile(auto) doesn't reload current profile, so ReloadSkin() is necessary
+- User Experience: Toggle setting → Click OK → Settings close → UI refreshes automatically
+
+v1.0.56 (2025-10-28)
+- Fixed: Invalid setting type "lsep" causing "EXCEPTION: Invalid setting type" in Kodi log
+- Fixed: Removed ReloadSkin() from profile refresh - it was closing settings dialog unexpectedly
+- Fixed: Corrected visible offset values in settings.xml after removing lsep entries
+- Improved: More graceful UI refresh that doesn't disrupt user while in settings
+
+v1.0.55 (2025-10-28)
+- Enhanced: UI refresh now includes ReloadSkin() for immediate visibility
+- Fixed: Favourites window now updates immediately after adding/removing addon
+- Improved: Multi-step refresh sequence: Container.Refresh → LoadProfile → ReloadSkin → Container.Refresh
+- Result: Changes visible immediately without manual navigation
+
+[B]1.0.54[/B] (2025-10-28)
+- CRITICAL FIX: misc_add_to_fav now reads directly from settings.xml
+- Fixed: Bypasses Kodi's settings cache that was returning stale boolean values
+- Fixed: getSettingBool() returned False even when XML file contained true
+- Result: Toggle now properly reads user's intended setting value
+
+[B]1.0.53[/B] (2025-10-28)
+- CRITICAL FIX: Removed automatic misc_add_to_fav sync from service startup
+- CRITICAL FIX: Removed sync after onSettingsChanged to prevent setting overwrites  
+- Fixed: misc_add_to_fav toggle now works correctly - no race condition
+- Fixed: User's setting changes are no longer overwritten by automatic sync
+- Result: Toggling "Show addon in Favourites" now properly adds/removes addon
+
 [B]1.0.52[/B] (2025-10-28)
 - CRITICAL FIX: Profile refresh now properly shows changes immediately
 - Fixed: Added Container.Refresh before and after LoadProfile for proper UI update

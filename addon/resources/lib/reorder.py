@@ -3,6 +3,8 @@ Favourites reordering logic - groups and sorts addon shortcuts
 """
 import json
 import os
+import threading
+import time
 from datetime import datetime
 from typing import List, Dict, Any
 import xbmcvfs
@@ -25,12 +27,18 @@ SELF_ACTIONS = [
 ]
 
 
-def refresh_kodi_profile(set_reload_flag: bool = True) -> bool:
+def refresh_kodi_profile(
+    set_reload_flag: bool = True,
+    delay_skin_reload: bool = False,
+    focus_favourites: bool = False
+) -> bool:
     """
     Refresh Kodi profile to reload favourites.xml and other profile data.
     
     Args:
         set_reload_flag: If True, sets flag to prevent startup sync after reload
+        delay_skin_reload: If True, delays skin reload to allow dialogs to close first
+        focus_favourites: If True, opens Favourites window after reload
         
     Returns:
         True if reload was successful, False otherwise
@@ -48,26 +56,62 @@ def refresh_kodi_profile(set_reload_flag: bool = True) -> bool:
                 except Exception as e:
                     log_error(kvfmt(event="reload_flag_failed", error=str(e)))
         
-        # First refresh the container to update the UI
-        try:
-            xbmc.executebuiltin("Container.Refresh")
-            log_info(kvfmt(event="container_refreshed_pre"))
-            xbmc.sleep(500)  # Give container time to refresh
-        except Exception as e:
-            log_error(kvfmt(event="container_refresh_pre_failed", error=str(e)))
+        log_info("Refreshing Kodi profile...")
         
-        # Then reload the full profile to ensure all data is reloaded
-        xbmc.executebuiltin("LoadProfile(auto)")
-        log_info(kvfmt(event="profile_refreshed", flag_set=set_reload_flag))
+        if delay_skin_reload:
+            # Delayed approach: Let settings/addon dialogs close before forcing a refresh
+            def delayed_reload():
+                monitor = xbmc.Monitor()
+                wait_until = time.time() + 5.0
+                try:
+                    log_info(kvfmt(event="delayed_reload_waiting"))
+                    while time.time() < wait_until and not monitor.abortRequested():
+                        if not (
+                            xbmc.getCondVisibility("Window.IsActive(settings)") or
+                            xbmc.getCondVisibility("Window.IsActive(addonsettings)")
+                        ):
+                            break
+                        monitor.waitForAbort(0.2)
+                    
+                    xbmc.sleep(200)  # Extra grace period after dialog closes
+                    
+                    log_info(kvfmt(event="delayed_reload_starting"))
+                    
+                    # Use LoadProfile with actual profile name - the ONLY reliable way
+                    current_profile = xbmc.getInfoLabel('System.ProfileName')
+                    log_info(kvfmt(event="current_profile", profile=current_profile))
+                    xbmc.executebuiltin(f'LoadProfile({current_profile})')
+                    log_info(kvfmt(event="profile_reloaded", profile=current_profile))
+                    
+                    xbmc.sleep(500)  # Wait for profile reload
+                    
+                    if focus_favourites:
+                        xbmc.sleep(200)
+                        xbmc.executebuiltin("ActivateWindow(favourites)")
+                        xbmc.sleep(200)
+                        xbmc.executebuiltin("Container.Refresh")
+                        log_info(kvfmt(event="favourites_window_refreshed"))
+                except Exception as thread_error:
+                    log_error(kvfmt(event="delayed_reload_failed", error=str(thread_error)))
+            
+            thread = threading.Thread(target=delayed_reload, name="fav-sync-delayed-reload", daemon=True)
+            thread.start()
+            log_info(kvfmt(event="delayed_reload_scheduled"))
+        else:
+            # Immediate approach: Use LoadProfile with actual profile name
+            current_profile = xbmc.getInfoLabel('System.ProfileName')
+            log_info(kvfmt(event="current_profile", profile=current_profile))
+            xbmc.executebuiltin(f'LoadProfile({current_profile})')
+            log_info(kvfmt(event="profile_reloaded", profile=current_profile))
+            xbmc.sleep(500)
+            
+            if focus_favourites:
+                xbmc.executebuiltin("ActivateWindow(favourites)")
+                xbmc.sleep(200)
+                xbmc.executebuiltin("Container.Refresh")
+                log_info(kvfmt(event="favourites_window_refreshed"))
         
-        # Final container refresh to ensure UI is updated
-        xbmc.sleep(500)  # Give LoadProfile time to complete
-        try:
-            xbmc.executebuiltin("Container.Refresh")
-            log_info(kvfmt(event="container_refreshed_post"))
-        except Exception as e:
-            log_error(kvfmt(event="container_refresh_post_failed", error=str(e)))
-        
+        log_info("Profile refresh completed")
         return True
         
     except Exception as e:
@@ -250,8 +294,8 @@ def reload_favourites(manual_context: bool = False, skip_reload: bool = False):
         log_info(kvfmt(event="skip_reload", reason="non_manual_context"))
         return
     
-    # Use the new refresh_kodi_profile function
-    refresh_kodi_profile(set_reload_flag=True)
+    # Use delayed reload for manual context to allow settings dialog to close first
+    refresh_kodi_profile(set_reload_flag=True, delay_skin_reload=True, focus_favourites=True)
 
 
 def reorder_favourites(manual_context: bool = False, skip_profile_reload: bool = False) -> Dict[str, Any]:

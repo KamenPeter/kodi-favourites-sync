@@ -82,19 +82,6 @@ def run():
     cfg = schedule_config()
     log_info(kvfmt(event="service_start", mode=cfg.mode, enabled=cfg.enabled, startup=cfg.on_startup, shutdown=cfg.on_shutdown))
     
-    # Sync misc_add_to_fav state with actual file after service starts
-    try:
-        try:
-            from .settings_mgr import sync_misc_add_to_fav_state
-        except Exception:
-            from settings_mgr import sync_misc_add_to_fav_state
-        
-        # Small delay to ensure Kodi is fully ready
-        if not monitor.waitForAbort(2):
-            sync_misc_add_to_fav_state()
-    except Exception as e:
-        log_error(kvfmt(event="initial_sync_failed", error=str(e)))
-    
     # Check if this is a recent profile reload (triggered by our addon)
     is_reload = _is_recent_reload()
     
@@ -156,6 +143,12 @@ class _Monitor(xbmc.Monitor):
     def onSettingsChanged(self):
         """Handle settings changes - auto-apply reorder when user clicks OK"""
         try:
+            # Small delay to ensure Kodi has saved settings to XML
+            xbmc.sleep(200)
+            
+            # Force reload addon to pick up fresh settings from XML
+            addon = xbmcaddon.Addon()
+            
             # Get current misc settings
             try:
                 from .settings_mgr import (
@@ -181,6 +174,8 @@ class _Monitor(xbmc.Monitor):
                 'sort': misc_sort_addons()
             }
             
+            log_info(kvfmt(event="settings_read", state=current_state))
+            
             # Check if misc settings changed
             if self._last_settings_state != current_state:
                 log_info(kvfmt(event="misc_settings_changed", prev=self._last_settings_state, current=current_state))
@@ -200,12 +195,6 @@ class _Monitor(xbmc.Monitor):
                 
                 # Reorder favourites - this will write changes and reload profile
                 result = reorder_favourites(manual_context=True, skip_profile_reload=False)
-                
-                # Ensure misc_add_to_fav matches actual favourites.xml contents after applying changes
-                try:
-                    sync_misc_add_to_fav_state()
-                except Exception as e:
-                    log_error(kvfmt(event="sync_add_to_fav_resync_failed", error=str(e)))
                 
                 if result.get('changed'):
                     log_info(kvfmt(event="auto_reorder_success", result=result))
