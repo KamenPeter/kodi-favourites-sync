@@ -1,4 +1,7 @@
-[B]1.0.4[/B] (2025-10-28)
+[B]Version 1.0.5[/B]
+- Updated dependency to service addon v1.0.64
+
+[B]Version 1.0.4[/B] (2025-10-28)
 - Enhanced: Added action button in settings to directly open service addon settings
 - Improved: Settings now includes "→ Open Service Settings" button for easy access
 - Context: Makes it easier to configure the service addon from program addon context

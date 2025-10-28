@@ -131,6 +131,12 @@ def run():
         except Exception as e:
             log_error(kvfmt(event="shutdown_sync_import_failed", error=str(e)))
     
+    # Stop RPC server before exiting
+    try:
+        rpc.stop_server()
+    except Exception as e:
+        log_error(kvfmt(event="rpc_stop_failed", error=str(e)))
+    
     log_info("Service stopped")
 
 

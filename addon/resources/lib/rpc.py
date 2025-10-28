@@ -13,6 +13,7 @@ except Exception:
 	from logutil import log_info, log_error, kvfmt
 
 _server_thread = None
+_server_instance = None
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -63,7 +64,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def start_server(host: str = "127.0.0.1", port: int = None):
-	global _server_thread
+	global _server_thread, _server_instance
 	if _server_thread and _server_thread.is_alive():
 		return
 	try:
@@ -71,13 +72,31 @@ def start_server(host: str = "127.0.0.1", port: int = None):
 	except Exception:
 		port = 8765
 	server = HTTPServer((host, port), Handler)
+	_server_instance = server
 	def run():
 		log_info(kvfmt(event="rpc_listen", host=host, port=port))
 		try:
 			server.serve_forever(poll_interval=0.5)
 		except Exception:
 			pass
+		log_info(kvfmt(event="rpc_stopped"))
 	t = threading.Thread(target=run, name="favsync-rpc", daemon=True)
 	t.start()
 	_server_thread = t
+
+
+def stop_server():
+	"""Stop the RPC server gracefully"""
+	global _server_instance, _server_thread
+	if _server_instance:
+		try:
+			log_info(kvfmt(event="rpc_shutdown_requested"))
+			_server_instance.shutdown()
+			_server_instance.server_close()
+			_server_instance = None
+		except Exception as e:
+			log_error(kvfmt(event="rpc_shutdown_failed", error=str(e)))
+	if _server_thread and _server_thread.is_alive():
+		_server_thread.join(timeout=2.0)
+	_server_thread = None
 

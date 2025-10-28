@@ -1,3 +1,16 @@
+v1.0.64 (2025-10-28)
+- CRITICAL FIX: RPC server now shuts down gracefully
+- Fixed: Added stop_server() function to properly shutdown HTTP server
+- Fixed: Call server.shutdown() before service exits
+- Result: No more SystemExit threading exceptions, clean 5-second shutdown
+
+v1.0.63 (2025-10-28)
+- Fixed: Threading SystemExit exception during Python shutdown
+- Enhanced: Added SystemExit exception handling in delayed reload thread
+- Enhanced: Added abort checks before continuing with reload operations
+- Optimized: Reduced sleep times in delayed reload (500ms → 300ms, 200ms → 100ms)
+- Result: Cleaner shutdown, no threading exceptions in logs
+
 v1.0.62 (2025-10-28)
 - CRITICAL FIX: Fixed Kodi crash caused by invalid window name "favourites"
 - Fixed: Changed ActivateWindow(favourites) to ActivateWindow(10134) - correct window ID

@@ -72,6 +72,11 @@ def refresh_kodi_profile(
                             break
                         monitor.waitForAbort(0.2)
                     
+                    # Check if we should abort before continuing
+                    if monitor.abortRequested():
+                        log_info(kvfmt(event="delayed_reload_aborted"))
+                        return
+                    
                     xbmc.sleep(200)  # Extra grace period after dialog closes
                     
                     log_info(kvfmt(event="delayed_reload_starting"))
@@ -82,15 +87,18 @@ def refresh_kodi_profile(
                     xbmc.executebuiltin(f'LoadProfile({current_profile})')
                     log_info(kvfmt(event="profile_reloaded", profile=current_profile))
                     
-                    xbmc.sleep(500)  # Wait for profile reload
+                    xbmc.sleep(300)  # Wait for profile reload (reduced from 500ms)
                     
-                    if focus_favourites:
-                        xbmc.sleep(200)
+                    if focus_favourites and not monitor.abortRequested():
+                        xbmc.sleep(100)
                         # Use window ID 10134 (Favourites window) instead of name
                         xbmc.executebuiltin("ActivateWindow(10134)")
-                        xbmc.sleep(200)
+                        xbmc.sleep(100)
                         xbmc.executebuiltin("Container.Refresh")
                         log_info(kvfmt(event="favourites_window_refreshed"))
+                except SystemExit:
+                    # Python is shutting down, exit gracefully
+                    log_info(kvfmt(event="delayed_reload_system_exit"))
                 except Exception as thread_error:
                     log_error(kvfmt(event="delayed_reload_failed", error=str(thread_error)))
             
@@ -216,7 +224,7 @@ def ensure_self_shortcut(entries: List[FavEntry]) -> bool:
     self_entry = FavEntry(
         name="Favourites Sync (Cloud)",
         action=SELF_ACTIONS[1],  # Prefer RunAddon form
-        thumb=None,
+        thumb="special://home/addons/plugin.service.favourites-sync/icon.png",
         type="addon"
     )
     entries.insert(0, self_entry)
