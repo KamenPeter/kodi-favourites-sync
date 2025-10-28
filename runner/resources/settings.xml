@@ -3,10 +3,13 @@
     <setting id="info_title" type="text" label="This launcher add-on has no settings" enable="false" default="" />
     <setting id="info_blank1" type="sep" />
     <setting id="info_config" type="text" label="To configure Favourites Sync:" enable="false" default="" />
+    <setting id="info_action" type="action" label="→ Open Service Settings" action="Addon.OpenSettings(plugin.service.favourites-sync)" option="close" />
+    <setting id="info_blank2" type="sep" />
+    <setting id="info_alt1" type="text" label="Alternative:" enable="false" default="" />
     <setting id="info_step1" type="text" label="1. Go to Services category" enable="false" default="" />
     <setting id="info_step2" type="text" label="2. Find Favourites Sync (Cloud)" enable="false" default="" />
     <setting id="info_step3" type="text" label="3. Open its settings" enable="false" default="" />
-    <setting id="info_blank2" type="sep" />
+    <setting id="info_blank3" type="sep" />
     <setting id="info_run" type="text" label="Or simply RUN this launcher from Programs" enable="false" default="" />
   </category>
 </settings>

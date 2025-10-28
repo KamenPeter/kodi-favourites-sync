@@ -1,3 +1,19 @@
+v1.0.62 (2025-10-28)
+- CRITICAL FIX: Fixed Kodi crash caused by invalid window name "favourites"
+- Fixed: Changed ActivateWindow(favourites) to ActivateWindow(10134) - correct window ID
+- Fixed: Service now stops cleanly without timeout errors
+- Context: Window name "favourites" doesn't exist in Kodi, must use window ID 10134
+
+v1.0.61 (2025-10-28)
+- Fixed: Restored thumb icon path for addon entry in favourites.xml
+- Enhancement: Self-shortcut now includes special://home/addons/plugin.service.favourites-sync/icon.png
+- Visual: Addon now displays with its icon in Favourites window
+
+v1.0.60 (2025-10-28)
+- Fixed: Settings menu now always opens service addon settings, even when called from program addon
+- Enhanced: open_settings() function explicitly opens plugin.service.favourites-sync settings
+- Context: Ensures consistent settings experience regardless of launcher entry point
+
 v1.0.59 (2025-10-28)
 - CRITICAL FIX: Restored working profile reload mechanism from v1.0.31
 - Fixed: UI changes now visible immediately - favourites.xml reloads properly

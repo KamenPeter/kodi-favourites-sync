@@ -1,5 +1,166 @@
 # Changelog
 
+## 1.0.62 (2025-10-28) - Service Addon
+
+**CRITICAL FIX: Kodi Crash After Profile Reload**
+
+**Problem:**
+Kodi crashed when toggling `misc_add_to_fav` to OFF. The service timed out and was forcefully killed after 5 seconds.
+
+**Root Cause (From Logs):**
+```
+error: Window Translator: Can't find window favourites
+error: Activate/ReplaceWindow called with invalid destination window: favourites
+error: script didn't stop in 5 seconds - let's kill it
+```
+
+The code was using `ActivateWindow(favourites)` which is an invalid window name in Kodi.
+
+**Solution:**
+Changed to use the correct window ID `10134` (Favourites window):
+
+```python
+# Before (BROKEN - causes crash)
+xbmc.executebuiltin("ActivateWindow(favourites)")
+
+# After (FIXED - uses window ID)
+xbmc.executebuiltin("ActivateWindow(10134)")
+```
+
+**Code Changes:**
+
+`addon/resources/lib/reorder.py` - `refresh_kodi_profile()`:
+- Delayed reload path: Changed `ActivateWindow(favourites)` → `ActivateWindow(10134)`
+- Immediate reload path: Changed `ActivateWindow(favourites)` → `ActivateWindow(10134)`
+- Added comments explaining the window ID
+
+**Result:**
+- ✅ No more crashes when toggling misc_add_to_fav
+- ✅ Service stops cleanly without timeout
+- ✅ Favourites window opens correctly when `focus_favourites=True`
+
+**Files Modified:**
+- `addon/resources/lib/reorder.py` - Fixed window activation in both code paths
+
+**Testing:**
+1. Toggle `misc_add_to_fav` OFF
+2. Profile reloads successfully
+3. No crash, no timeout
+4. Kodi continues running normally
+
+---
+
+## 1.0.61 (2025-10-28) - Service Addon
+
+**Restored Thumb Icon Path**
+
+**Problem:**
+The addon entry in favourites.xml was missing the thumb attribute, so it displayed without an icon.
+
+**Solution:**
+Updated `ensure_self_shortcut()` in `reorder.py` to include the thumb path when creating the self-shortcut entry.
+
+**Code Changes:**
+
+```python
+# Before
+self_entry = FavEntry(
+    name="Favourites Sync (Cloud)",
+    action=SELF_ACTIONS[0],
+    thumb=None,  # ← Missing icon
+    type="addon"
+)
+
+# After
+self_entry = FavEntry(
+    name="Favourites Sync (Cloud)",
+    action=SELF_ACTIONS[0],
+    thumb=f"special://home/addons/{ADDON_ID}/icon.png",  # ← Icon restored
+    type="addon"
+)
+```
+
+**Result:**
+Favourites entry now includes:
+```xml
+<favourite name="Favourites Sync (Cloud)" 
+           thumb="special://home/addons/plugin.service.favourites-sync/icon.png">
+    RunAddon("plugin.service.favourites-sync")
+</favourite>
+```
+
+**Files Modified:**
+- `addon/resources/lib/reorder.py` - `ensure_self_shortcut()` function
+
+---
+
+## 1.0.60 (2025-10-28) - Service Addon
+
+**Settings Always Open Service Addon**
+
+**Problem:**
+When clicking "Settings" from the program addon's menu, it would try to open settings for the wrong addon context.
+
+**Solution:**
+
+1. **Updated `open_settings()` in settings_mgr.py**
+   - Now explicitly opens `plugin.service.favourites-sync` settings
+   - Added fallback error handling
+   - Works correctly regardless of which addon calls it
+
+```python
+def open_settings(category_id=None):
+    """Open the service addon settings, regardless of which addon calls this function"""
+    try:
+        # Always open the service addon settings explicitly
+        service_addon = xbmcaddon.Addon("plugin.service.favourites-sync")
+        if category_id:
+            service_addon.openSettings()
+        else:
+            service_addon.openSettings()
+    except Exception as e:
+        # Fallback: try without explicit ID
+        log_info(f"Failed to open service settings explicitly: {e}")
+        _get_addon().openSettings()
+```
+
+**Files Modified:**
+- `addon/resources/lib/settings_mgr.py` - `open_settings()` function
+
+---
+
+## 1.0.4 (2025-10-28) - Program Addon
+
+**Direct Settings Access Button**
+
+**Enhancement:**
+Added action button in program addon settings to directly open service addon settings.
+
+**Changes:**
+
+1. **Updated runner/resources/settings.xml**
+   - Added action button: "→ Open Service Settings"
+   - Uses `Addon.OpenSettings(plugin.service.favourites-sync)` action
+   - Button closes current dialog and opens service settings
+
+```xml
+<setting id="info_action" type="action" 
+         label="→ Open Service Settings" 
+         action="Addon.OpenSettings(plugin.service.favourites-sync)" 
+         option="close" />
+```
+
+**User Experience:**
+- Open program addon settings
+- Click "→ Open Service Settings" button
+- Service addon settings open automatically
+
+**Files Modified:**
+- `runner/resources/settings.xml` - Added action button
+- `runner/addon.xml` - Version 1.0.4, requires service v1.0.60
+
+---
+
 ## 1.0.59 (2025-10-28)
 
 **CRITICAL FIX: Restored Working Profile Reload from v1.0.31**

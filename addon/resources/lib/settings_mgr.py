@@ -84,13 +84,21 @@ def is_endpoint_valid():
         return False
 
 def open_settings(category_id=None):
-    if category_id:
+    """Open the service addon settings, regardless of which addon calls this function"""
+    try:
+        # Always open the service addon settings explicitly
+        service_addon = xbmcaddon.Addon("plugin.service.favourites-sync")
+        if category_id:
+            service_addon.openSettings()
+        else:
+            service_addon.openSettings()
+    except Exception as e:
+        # Fallback: try without explicit ID
+        log_info(f"Failed to open service settings explicitly: {e}")
         try:
             _get_addon().openSettings()
-        except Exception:
-            _get_addon().openSettings()
-    else:
-        _get_addon().openSettings()
+        except Exception as e2:
+            log_info(f"Failed to open settings via _get_addon: {e2}")
 
 class ScheduleCfg:
     def __init__(self, enabled, mode, on_startup, on_shutdown, delay, scheduled_mode):

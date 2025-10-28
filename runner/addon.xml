@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <addon id="plugin.program.favourites-sync"
        name="Favourites Sync (Launcher)"
-       version="1.0.3"
+       version="1.0.4"
        provider-name="Kamen">
   <requires>
     <import addon="xbmc.python" version="3.0.0"/>
-    <import addon="plugin.service.favourites-sync" version="1.0.58"/>
+    <import addon="plugin.service.favourites-sync" version="1.0.60"/>
   </requires>
 
   <extension point="xbmc.python.script" library="default.py">
@@ -17,7 +17,7 @@
     <description lang="en_GB">Visible Programs entry that opens the Favourites Sync menu while the service continues to run in the background.</description>
     <platform>all</platform>
     <license>GPL-3.0</license>
-    <news>v1.0.3: Added informational settings to prevent "can't be configured" error message</news>
+    <news>v1.0.4: Added button in settings to directly open service addon settings</news>
     <assets>
       <icon>icon.png</icon>
       <fanart>fanart.jpg</fanart>

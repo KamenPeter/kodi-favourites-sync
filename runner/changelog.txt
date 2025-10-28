@@ -1,3 +1,8 @@
+[B]1.0.4[/B] (2025-10-28)
+- Enhanced: Added action button in settings to directly open service addon settings
+- Improved: Settings now includes "→ Open Service Settings" button for easy access
+- Context: Makes it easier to configure the service addon from program addon context
+
 [B]1.0.3[/B] (2025-10-28)
 - Added: Informational settings.xml to prevent "can't be configured" error
 - Improved: Settings now show instructions on how to configure the service addon

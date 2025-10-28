@@ -26,7 +26,6 @@ SELF_ACTIONS = [
     f'RunScript(special://home/addons/{ADDON_ID}/resources/lib/addon.py)'
 ]
 
-
 def refresh_kodi_profile(
     set_reload_flag: bool = True,
     delay_skin_reload: bool = False,
@@ -87,7 +86,8 @@ def refresh_kodi_profile(
                     
                     if focus_favourites:
                         xbmc.sleep(200)
-                        xbmc.executebuiltin("ActivateWindow(favourites)")
+                        # Use window ID 10134 (Favourites window) instead of name
+                        xbmc.executebuiltin("ActivateWindow(10134)")
                         xbmc.sleep(200)
                         xbmc.executebuiltin("Container.Refresh")
                         log_info(kvfmt(event="favourites_window_refreshed"))
@@ -104,6 +104,13 @@ def refresh_kodi_profile(
             xbmc.executebuiltin(f'LoadProfile({current_profile})')
             log_info(kvfmt(event="profile_reloaded", profile=current_profile))
             xbmc.sleep(500)
+            
+            if focus_favourites:
+                # Use window ID 10134 (Favourites window) instead of name
+                xbmc.executebuiltin("ActivateWindow(10134)")
+                xbmc.sleep(200)
+                xbmc.executebuiltin("Container.Refresh")
+                log_info(kvfmt(event="favourites_window_refreshed"))
             
             if focus_favourites:
                 xbmc.executebuiltin("ActivateWindow(favourites)")
@@ -208,7 +215,7 @@ def ensure_self_shortcut(entries: List[FavEntry]) -> bool:
     # Add self shortcut at beginning
     self_entry = FavEntry(
         name="Favourites Sync (Cloud)",
-        action=SELF_ACTIONS[0],  # Prefer RunAddon form
+        action=SELF_ACTIONS[1],  # Prefer RunAddon form
         thumb=None,
         type="addon"
     )
