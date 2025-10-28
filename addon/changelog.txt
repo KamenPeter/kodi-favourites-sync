@@ -1,3 +1,44 @@
+[B]1.0.52[/B] (2025-10-28)
+- CRITICAL FIX: Profile refresh now properly shows changes immediately
+- Fixed: Added Container.Refresh before and after LoadProfile for proper UI update
+- Fixed: misc_add_to_fav now syncs correctly on service startup (moved from Monitor to run())
+- Improved: Better logging for sync_misc_add_to_fav_state function
+- Result: Setting checkbox now reflects actual favourites.xml state accurately
+
+[B]1.0.51[/B] (2025-10-28)
+- NEW: Added refresh_kodi_profile() function for programmatic profile refresh
+- NEW: Added "Refresh Profile" option to main menu
+- Improved: Centralized profile reload logic in reusable function
+- Feature: Manual profile refresh now available from launcher menu
+
+[B]1.0.50[/B] (2025-10-27)
+- CRITICAL FIX: Prevented unwanted startup sync when profile reloads
+- Fixed: Startup sync no longer runs when toggling misc settings (with schedule_enabled=false)
+- Added: Reload flag debounce mechanism to detect addon-triggered profile reloads
+- Improved: Service now distinguishes between Kodi startup and profile reload events
+- Result: No unexpected sync messages when using misc settings or manual operations
+
+[B]1.0.49[/B] (2025-10-27)
+- HOTFIX: Restored immediate profile reload when toggling "Add to favourites" setting
+- Fixed: Profile now reloads properly after misc_add_to_fav toggle (changes visible instantly)
+- Improved: Simplified onSettingsChanged() flow to avoid timing issues
+- Improved: Added 300ms delay before toast notification to ensure reload completes
+- Result: Toggling the setting now provides immediate visual feedback
+
+[B]1.0.48[/B] (2025-10-27)
+- MAJOR: Fixed Miscellaneous settings behavior - now fully functional
+- NEW: Two-way sync for "Add to favourites" - setting reflects actual file state
+- Fixed: Reorder engine now actually writes to favourites.xml (was broken)
+- Fixed: Auto-apply reorder when settings are changed (no manual button needed)
+- Fixed: Profile reloads after favourites.xml updates - changes visible immediately
+- Added: Remove shortcut functionality when "Add to favourites" is toggled OFF
+- Added: Toast notifications for reorder operations (non-blocking UI)
+- Improved: Compound keys (action+name) for manual order persistence
+- Improved: Handles both RunAddon() and RunScript() self-shortcut forms
+- Improved: Comprehensive logging for all reorder operations
+- Fixed: In-place reorder when "Group addons at top" is disabled
+- Result: Settings → Miscellaneous now works exactly as designed
+
 [B]1.0.47[/B] (2025-10-27)
 - ARCHITECTURAL CHANGE: Split into two addons for better UX
 - NEW: Separate launcher addon (plugin.program.favourites-sync) provides RUN button in Programs menu

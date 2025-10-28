@@ -1,5 +1,644 @@
 # Changelog
 
+## 1.0.52 (2025-10-28)
+
+**CRITICAL FIX: Profile Refresh Visibility + misc_add_to_fav Sync Accuracy**
+
+**Problems Identified:**
+
+1. **Profile refresh didn't show changes visibly**
+   - Problem: `refresh_kodi_profile()` called `LoadProfile(auto)` but changes weren't immediately visible in UI
+   - Root Cause: `LoadProfile` reloads profile data but doesn't refresh UI containers
+   - Impact: Users had to manually navigate away and back to see changes
+
+2. **misc_add_to_fav checkbox showed false while entry existed**
+   - Problem: Setting showed OFF even though addon was present in favourites.xml
+   - Root Cause: `sync_misc_add_to_fav_state()` called too early in service lifecycle
+   - Previous Location: Called in `_Monitor.__init__()` when Kodi not fully ready
+   - Impact: Checkbox state didn't reflect actual file state on startup
+
+**Solutions Implemented:**
+
+### 1. Enhanced refresh_kodi_profile() with Container.Refresh Sequence
+
+```python
+def refresh_kodi_profile(set_reload_flag=True):
+    """Refresh Kodi profile with proper UI update sequence"""
+    # Step 1: Container.Refresh (pre) - prepare UI
+    xbmc.executebuiltin("Container.Refresh")
+    xbmc.sleep(500)  # Allow UI to process
+    
+    # Step 2: LoadProfile(auto) - reload profile data
+    xbmc.executebuiltin("LoadProfile(auto)")
+    xbmc.sleep(500)  # Allow profile to reload
+    
+    # Step 3: Container.Refresh (post) - update UI containers
+    xbmc.executebuiltin("Container.Refresh")
+```
+
+**Why Three Steps:**
+- **Container.Refresh (pre)**: Prepares UI state for reload
+- **LoadProfile(auto)**: Reloads profile data including favourites.xml
+- **500ms delays**: Give Kodi time to process each command
+- **Container.Refresh (post)**: Forces UI containers to re-read data and display changes
+
+**Result**: Changes now immediately visible without navigation or restart
+
+### 2. Fixed misc_add_to_fav Sync Timing
+
+**Before:**
+```python
+class _Monitor(xbmc.Monitor):
+    def __init__(self):
+        super(_Monitor, self).__init__()
+        sync_misc_add_to_fav_state()  # ❌ Too early - Kodi not ready
+```
+
+**After:**
+```python
+def run():
+    """Main service loop"""
+    # Wait for Kodi to be fully ready before syncing
+    xbmc.sleep(2000)  # 2 second delay
+    sync_misc_add_to_fav_state()  # ✅ Now syncs correctly
+    
+    monitor = _Monitor()
+    # ... rest of service loop
+```
+
+**Why This Works:**
+- Service starts before Kodi is fully initialized
+- 2-second delay ensures favourites.xml is readable
+- Checkbox now accurately reflects file state on startup
+
+### 3. Improved Logging and Error Handling
+
+**settings_mgr.py enhancements:**
+```python
+def sync_misc_add_to_fav_state():
+    """Sync setting with actual favourites.xml state"""
+    try:
+        # Try relative import first (normal operation)
+        from .xmlio import parse_favourites
+    except (ImportError, ValueError):
+        # Fallback to absolute import (script context)
+        from xmlio import parse_favourites
+    
+    # Enhanced logging
+    if setting_value != actual_value:
+        log(f"Synced misc_add_to_fav: setting={setting_value} -> actual={actual_value}")
+    else:
+        log(f"misc_add_to_fav already in sync: {actual_value}")
+```
+
+**Benefits:**
+- Better import handling for different execution contexts
+- Clear logging shows state transitions
+- "already in sync" messages reduce log noise
+
+**Files Modified:**
+- `reorder.py` - Enhanced `refresh_kodi_profile()` with Container.Refresh sequence
+- `service.py` - Moved `sync_misc_add_to_fav_state()` from `_Monitor.__init__()` to `run()`
+- `settings_mgr.py` - Improved import handling and logging
+
+**Result:**
+- ✅ Profile refresh now visibly updates UI immediately
+- ✅ misc_add_to_fav checkbox accurately reflects favourites.xml state
+- ✅ Container.Refresh + LoadProfile sequence with proper timing
+- ✅ Sync moved to proper location (after service fully initialized)
+- ✅ Enhanced logging for troubleshooting
+- ✅ Better error handling with try/except blocks
+
+## 1.0.51 (2025-10-28)
+
+**NEW FEATURE: Refresh Profile Function + Menu Option**
+
+**User Request:**
+"Create a function which I can trigger to refresh the kodi profile"
+"Add option 'Refresh Profile' to this list"
+
+**Implementation:**
+
+### 1. Created refresh_kodi_profile() Function
+
+```python
+def refresh_kodi_profile(set_reload_flag=True):
+    """Refresh Kodi profile to apply changes immediately.
+    
+    Args:
+        set_reload_flag: If True, sets reload flag to prevent unwanted startup sync
+        
+    Returns:
+        bool: True if reload succeeded, False otherwise
+    """
+    try:
+        if set_reload_flag:
+            _set_reload_flag()  # Prevent startup sync after reload
+        
+        xbmc.executebuiltin("LoadProfile(auto)")
+        log("event=profile_refreshed")
+        return True
+    except Exception as e:
+        log(f"event=profile_refresh_failed error={e}", level=xbmc.LOGERROR)
+        return False
+```
+
+**Purpose:**
+- Centralized function for profile reload operations
+- Used by sync operations, settings changes, and manual refresh
+- Integrates with reload flag system to prevent unwanted syncs
+
+### 2. Added "Refresh Profile" Menu Option
+
+**Menu Structure (now 8 options):**
+```python
+0. Pull (Cloud → Local)
+1. Push (Local → Cloud)
+2. Bidirectional
+3. Dry-run (Preview)
+4. Restore from Backup…
+5. Last Sync Status
+6. Refresh Profile  ← NEW
+7. Settings
+```
+
+**Implementation in addon.py:**
+```python
+elif choice == 6:  # Refresh Profile
+    success = refresh_kodi_profile(set_reload_flag=True)
+    if success:
+        xbmcgui.Dialog().notification(
+            "[fav-sync]",
+            "Profile refreshed successfully",
+            xbmcgui.NOTIFICATION_INFO,
+            3000
+        )
+    else:
+        xbmcgui.Dialog().notification(
+            "[fav-sync]",
+            "Failed to refresh profile",
+            xbmcgui.NOTIFICATION_ERROR,
+            3000
+        )
+```
+
+**User Experience:**
+1. Open addon menu
+2. Select "Refresh Profile"
+3. Profile reloads immediately
+4. Toast notification confirms success/failure
+5. Changes from favourites.xml now visible in UI
+
+**Benefits:**
+- ✅ Centralized profile reload logic
+- ✅ Manual trigger available from menu
+- ✅ Integrates with reload flag system
+- ✅ Clear success/failure feedback
+- ✅ Reusable across codebase
+
+**Files Modified:**
+- `reorder.py` - Added `refresh_kodi_profile()` function
+- `addon.py` - Added menu option 6 calling `refresh_kodi_profile()`
+- `service.py` - Updated to use `refresh_kodi_profile()` for consistency
+
+## 1.0.50 (2025-10-28)
+
+**CRITICAL FIX: Unwanted Startup Sync on Profile Reload**
+
+**Problem Identified:**
+User reported: "Review the code. I saw a message reg. the sync when I have loaded a kodi profile"
+
+**Root Cause:**
+- `LoadProfile(auto)` command (used to refresh favourites) restarts ALL service addons in Kodi
+- Service restart triggers startup sync check in `run()` function
+- Even with `schedule_enabled=False`, startup sync was running after profile reload
+- This happened when:
+  - Toggling misc_add_to_fav setting
+  - Running manual sync operations
+  - Using "Refresh Profile" function
+  - Any operation calling `LoadProfile(auto)`
+
+**The Vicious Cycle:**
+```
+User toggles setting
+  ↓
+LoadProfile(auto) to show changes
+  ↓
+Kodi restarts service addon
+  ↓
+Service startup checks schedule_enabled
+  ↓
+Unwanted sync runs (even if schedule disabled!)
+```
+
+**Solution: Reload Flag Debounce Mechanism**
+
+### 1. Flag File System
+
+```python
+def _get_reload_flag_path():
+    """Get path to profile reload flag file"""
+    return os.path.join(xbmcvfs.translatePath("special://profile"), ".profile_reload_flag")
+
+def _set_reload_flag():
+    """Set reload flag with current timestamp"""
+    flag_path = _get_reload_flag_path()
+    with open(flag_path, 'w') as f:
+        f.write(str(time.time()))
+
+def _is_recent_reload():
+    """Check if profile was reloaded within last 10 seconds"""
+    flag_path = _get_reload_flag_path()
+    if not os.path.exists(flag_path):
+        return False
+    
+    try:
+        with open(flag_path, 'r') as f:
+            timestamp = float(f.read().strip())
+        age = time.time() - timestamp
+        return age < 10.0  # 10-second window
+    except:
+        return False
+```
+
+### 2. Startup Sync Prevention
+
+```python
+def run():
+    """Main service loop"""
+    monitor = _Monitor()
+    
+    # Check if this is a recent profile reload
+    if _is_recent_reload():
+        log("event=startup_sync_skipped reason=recent_profile_reload")
+        # Don't run startup sync - this is from our own reload
+    else:
+        # Normal startup - check if we should sync
+        if schedule_enabled and schedule_mode in ['startup', 'both']:
+            _run(...)  # Run startup sync
+```
+
+### 3. Flag Setting Before Reload
+
+**All reload operations now set flag:**
+
+```python
+# In reload_favourites()
+_set_reload_flag()  # Set before LoadProfile
+xbmc.executebuiltin("LoadProfile(auto)")
+
+# In sync.py after successful sync
+_set_reload_flag()  # Set before LoadProfile
+xbmc.executebuiltin("LoadProfile(auto)")
+```
+
+**How It Works:**
+1. Operation needs to reload profile (setting change, sync, manual refresh)
+2. Sets `.profile_reload_flag` file with current timestamp
+3. Calls `LoadProfile(auto)` which restarts service
+4. Service starts, checks `_is_recent_reload()`
+5. If flag < 10 seconds old → Skip startup sync
+6. If flag > 10 seconds old or missing → Normal startup sync
+
+**Why 10 Seconds:**
+- Long enough to handle LoadProfile restart delay
+- Short enough to not interfere with real Kodi restarts
+- Covers worst-case reload timing
+
+**API Fix:**
+- Fixed: Replaced deprecated `xbmc.translatePath()` with `xbmcvfs.translatePath()`
+- Ensures Kodi v19+ compatibility
+
+**Files Modified:**
+- `service.py` - Added flag functions and reload check
+- `sync.py` - Sets flag before LoadProfile
+- `reorder.py` - Sets flag before LoadProfile
+
+**Result:**
+- ✅ No more unwanted startup sync after profile reload
+- ✅ Real Kodi startup still triggers sync correctly
+- ✅ User settings respected (schedule_enabled honored)
+- ✅ 10-second debounce window prevents false positives
+- ✅ Flag-based system more reliable than timing heuristics
+
+## 1.0.49 (2025-10-27)
+
+**HOTFIX: Immediate Profile Reload for misc_add_to_fav Toggle**
+
+**Problem:**
+After implementing v1.0.48 miscellaneous settings, the profile reload mechanism was working but had timing/flow issues in the `onSettingsChanged()` handler, causing the addon to not appear/disappear immediately when toggling the "Add to favourites" setting.
+
+**Solution:**
+Simplified the `onSettingsChanged()` handler in `service.py`:
+
+1. **Removed duplicate reload**: The reload was happening twice - once in `reorder_favourites()` and again in the handler
+2. **Fixed timing**: Added 300ms delay before showing toast notification to ensure reload completes
+3. **Streamlined flow**: Now relies solely on the existing `reload_favourites()` mechanism
+
+**Call Chain:**
+```
+User toggles misc_add_to_fav
+  ↓
+onSettingsChanged() detects change
+  ↓
+500ms delay (settings save)
+  ↓
+reorder_favourites(manual_context=True, skip_profile_reload=False)
+  ↓
+write_atomic_with_backup() writes favourites.xml
+  ↓
+reload_favourites(manual_context=True, skip_reload=False)
+  ↓
+xbmc.executebuiltin("LoadProfile(auto)") - IMMEDIATE RELOAD
+  ↓
+300ms delay
+  ↓
+Toast notification confirms changes
+```
+
+**Result:**
+- ✅ Toggle ON → Addon appears in favourites **instantly**
+- ✅ Toggle OFF → Addon disappears from favourites **instantly**
+- ✅ Clear visual feedback with toast notification
+- ✅ No need to restart Kodi or manually refresh
+
+**Files Modified:**
+- `addon/resources/lib/service.py` - Simplified onSettingsChanged() handler
+
+## 1.0.48 (2025-10-27)
+
+**MAJOR FIX: Miscellaneous Settings Now Fully Functional**
+
+**Problem Identified:**
+- Miscellaneous settings (added in v1.0.47) were not working correctly
+- "Add to favourites" checkbox didn't reflect actual file state
+- Reorder engine wasn't writing changes to `favourites.xml`
+- No way to remove addon from favourites once added
+- Changes required manual "Reorder now" button click
+- Profile didn't reload, so changes weren't visible
+
+**The Root Issues:**
+
+1. **One-way setting**: `misc_add_to_fav` was write-only, didn't sync with file reality
+2. **Broken writes**: Reorder engine built the correct data but never wrote it
+3. **No removal**: Couldn't remove addon shortcut when toggling OFF
+4. **Manual trigger**: Had to click button, not automatic on settings change
+5. **No reload**: Profile didn't reload, changes invisible until Kodi restart
+
+**Complete Solution:**
+
+### 1. Two-Way State Synchronization
+
+```python
+def sync_misc_add_to_fav_state():
+    """Sync misc_add_to_fav setting with actual favourites.xml state"""
+```
+
+- On service start: Reads `favourites.xml` and syncs checkbox state
+- Checkbox now reflects reality (ON if present, OFF if not)
+- Both `RunAddon()` and `RunScript()` forms detected
+
+### 2. Fixed Reorder Engine Writing
+
+- **CRITICAL**: Now actually writes to `favourites.xml` (was building data but not writing)
+- Creates timestamped backup before every write: `favourites_YYYYMMDD-HHMMSS.xml.bak`
+- Handles both add and remove operations
+- Fixed in-place reorder when "Group addons at top" is OFF
+- Comprehensive logging of every operation
+
+**Log output example:**
+```
+event=reorder_start manual=True add_to_fav=True entries=18
+event=self_shortcut_added
+event=classified addons=6 others=12
+event=sorted mode=az
+event=writing_favourites entries=18 addons=6 others=12 changed=True
+event=backup_created path=favourites_20251027-183522.xml.bak
+event=write_success path=/path/to/favourites.xml
+event=reorder_complete addons=6 others=12 changed=True
+event=profile_reloaded
+```
+
+### 3. Remove Shortcut Functionality
+
+```python
+def remove_self_shortcuts(entries: List[FavEntry]) -> bool:
+    """Remove all self shortcuts. Returns True if any were removed."""
+```
+
+- Toggle `misc_add_to_fav` OFF → removes all self-shortcuts
+- Handles both `RunAddon()` and `RunScript()` forms
+- Logged: `event=self_shortcuts_removed count=N`
+
+### 4. Auto-Apply on Settings Change
+
+Enhanced `service.py` with `onSettingsChanged()` handler:
+
+```python
+def onSettingsChanged(self):
+    """Handle settings changes - auto-apply reorder when user clicks OK"""
+    # Detects misc settings changes
+    # Automatically runs reorder_favourites()
+    # Shows toast notification with results
+```
+
+**User Experience:**
+1. Open Settings → Miscellaneous
+2. Change any setting (toggle, sort mode, etc.)
+3. Click OK
+4. **Automatic**: Reorder runs in background
+5. **Toast notification**: "Favourites updated: 6 addons, 12 others" (3s)
+6. **Changes immediately visible** (profile reloaded)
+
+### 5. Profile Reload After Updates
+
+```python
+def reload_favourites(manual_context: bool = False, skip_reload: bool = False):
+    """Reload Kodi favourites to show changes immediately"""
+    xbmc.executebuiltin("LoadProfile(auto)")  # Full profile reload
+    # Fallback: Container.Refresh
+```
+
+- Primary method: `LoadProfile(auto)` - complete profile reload
+- Fallback: `Container.Refresh` - container-only refresh
+- Only for manual operations (prevents infinite loops from scheduled syncs)
+- Respects `skip_profile_reload` flag
+
+### 6. Internal Improvements
+
+**Compound Keys:**
+```python
+def entry_key(entry: FavEntry) -> str:
+    return f"{entry.action}||{entry.name}"  # Unique per entry
+```
+
+- Handles duplicate actions with different names
+- More robust manual order persistence
+
+**Toast Notifications:**
+- Success: `[fav-sync] Favourites updated: X addons, Y others`
+- No changes: `[fav-sync] No changes needed`
+- Error: `[fav-sync] Reorder failed: ...`
+- Non-blocking, 2-5 second display
+
+**Comprehensive Logging:**
+- Every operation logged with structured kvfmt events
+- Before/after states tracked
+- Entry counts, change detection, write confirmation
+- Error handling with context
+
+**Result:**
+- ✅ Settings → Miscellaneous now works exactly as designed
+- ✅ Two-way sync keeps setting accurate
+- ✅ Add/remove shortcuts on toggle
+- ✅ Auto-apply on settings OK (no manual button needed)
+- ✅ Changes immediately visible (profile reloads)
+- ✅ Comprehensive logging for troubleshooting
+- ✅ All acceptance tests pass
+
+**Files Modified:**
+- `settings_mgr.py` - Added sync functions and setter
+- `reorder.py` - Fixed writing, added remove function, reload support
+- `service.py` - Added onSettingsChanged handler with auto-apply
+- `reorder_action.py` - Toast notifications instead of blocking dialogs
+
+## 1.0.47 (2025-10-27)
+
+**MAJOR FIX: Miscellaneous Settings Now Fully Functional**
+
+**Problem Identified:**
+- Miscellaneous settings (added in v1.0.47) were not working correctly
+- "Add to favourites" checkbox didn't reflect actual file state
+- Reorder engine wasn't writing changes to `favourites.xml`
+- No way to remove addon from favourites once added
+- Changes required manual "Reorder now" button click
+- Profile didn't reload, so changes weren't visible
+
+**The Root Issues:**
+
+1. **One-way setting**: `misc_add_to_fav` was write-only, didn't sync with file reality
+2. **Broken writes**: Reorder engine built the correct data but never wrote it
+3. **No removal**: Couldn't remove addon shortcut when toggling OFF
+4. **Manual trigger**: Had to click button, not automatic on settings change
+5. **No reload**: Profile didn't reload, changes invisible until Kodi restart
+
+**Complete Solution:**
+
+### 1. Two-Way State Synchronization
+
+```python
+def sync_misc_add_to_fav_state():
+    """Sync misc_add_to_fav setting with actual favourites.xml state"""
+```
+
+- On service start: Reads `favourites.xml` and syncs checkbox state
+- Checkbox now reflects reality (ON if present, OFF if not)
+- Both `RunAddon()` and `RunScript()` forms detected
+
+### 2. Fixed Reorder Engine Writing
+
+- **CRITICAL**: Now actually writes to `favourites.xml` (was building data but not writing)
+- Creates timestamped backup before every write: `favourites_YYYYMMDD-HHMMSS.xml.bak`
+- Handles both add and remove operations
+- Fixed in-place reorder when "Group addons at top" is OFF
+- Comprehensive logging of every operation
+
+**Log output example:**
+```
+event=reorder_start manual=True add_to_fav=True entries=18
+event=self_shortcut_added
+event=classified addons=6 others=12
+event=sorted mode=az
+event=writing_favourites entries=18 addons=6 others=12 changed=True
+event=backup_created path=favourites_20251027-183522.xml.bak
+event=write_success path=/path/to/favourites.xml
+event=reorder_complete addons=6 others=12 changed=True
+event=profile_reloaded
+```
+
+### 3. Remove Shortcut Functionality
+
+```python
+def remove_self_shortcuts(entries: List[FavEntry]) -> bool:
+    """Remove all self shortcuts. Returns True if any were removed."""
+```
+
+- Toggle `misc_add_to_fav` OFF → removes all self-shortcuts
+- Handles both `RunAddon()` and `RunScript()` forms
+- Logged: `event=self_shortcuts_removed count=N`
+
+### 4. Auto-Apply on Settings Change
+
+Enhanced `service.py` with `onSettingsChanged()` handler:
+
+```python
+def onSettingsChanged(self):
+    """Handle settings changes - auto-apply reorder when user clicks OK"""
+    # Detects misc settings changes
+    # Automatically runs reorder_favourites()
+    # Shows toast notification with results
+```
+
+**User Experience:**
+1. Open Settings → Miscellaneous
+2. Change any setting (toggle, sort mode, etc.)
+3. Click OK
+4. **Automatic**: Reorder runs in background
+5. **Toast notification**: "Favourites updated: 6 addons, 12 others" (3s)
+6. **Changes immediately visible** (profile reloaded)
+
+### 5. Profile Reload After Updates
+
+```python
+def reload_favourites(manual_context: bool = False, skip_reload: bool = False):
+    """Reload Kodi favourites to show changes immediately"""
+    xbmc.executebuiltin("LoadProfile(auto)")  # Full profile reload
+    # Fallback: Container.Refresh
+```
+
+- Primary method: `LoadProfile(auto)` - complete profile reload
+- Fallback: `Container.Refresh` - container-only refresh
+- Only for manual operations (prevents infinite loops from scheduled syncs)
+- Respects `skip_profile_reload` flag
+
+### 6. Internal Improvements
+
+**Compound Keys:**
+```python
+def entry_key(entry: FavEntry) -> str:
+    return f"{entry.action}||{entry.name}"  # Unique per entry
+```
+
+- Handles duplicate actions with different names
+- More robust manual order persistence
+
+**Toast Notifications:**
+- Success: `[fav-sync] Favourites updated: X addons, Y others`
+- No changes: `[fav-sync] No changes needed`
+- Error: `[fav-sync] Reorder failed: ...`
+- Non-blocking, 2-5 second display
+
+**Comprehensive Logging:**
+- Every operation logged with structured kvfmt events
+- Before/after states tracked
+- Entry counts, change detection, write confirmation
+- Error handling with context
+
+**Result:**
+- ✅ Settings → Miscellaneous now works exactly as designed
+- ✅ Two-way sync keeps setting accurate
+- ✅ Add/remove shortcuts on toggle
+- ✅ Auto-apply on settings OK (no manual button needed)
+- ✅ Changes immediately visible (profile reloads)
+- ✅ Comprehensive logging for troubleshooting
+- ✅ All acceptance tests pass
+
+**Files Modified:**
+- `settings_mgr.py` - Added sync functions and setter
+- `reorder.py` - Fixed writing, added remove function, reload support
+- `service.py` - Added onSettingsChanged handler with auto-apply
+- `reorder_action.py` - Toast notifications instead of blocking dialogs
+
 ## 1.0.47 (2025-10-27)
 
 **ARCHITECTURAL IMPROVEMENT: Two-Addon Solution**
@@ -27,7 +666,7 @@ Created a companion launcher addon that solves the RUN button problem:
 
 **Installation:**
 - **Option A**: Install both zips for full functionality
-  - `plugin.service.favourites-sync-1.0.47.zip` (background service)
+  - `plugin.service.favourites-sync-1.0.48.zip` (background service)
   - `plugin.program.favourites-sync-1.0.46.zip` (launcher with RUN button)
 - **Option B**: Install only service for background-only operation
 

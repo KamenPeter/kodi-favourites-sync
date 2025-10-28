@@ -25,10 +25,23 @@ def build_addon(addon_dir: Path) -> None:
 
     print(f"Building {zip_path} ...")
 
+    # Patterns to exclude
+    EXCLUDE_PATTERNS = ['__pycache__', '.pyc', '.pyo', '.git', '.DS_Store', 'Thumbs.db']
+    
+    def should_exclude(path: Path) -> bool:
+        """Check if path should be excluded from ZIP"""
+        path_str = str(path)
+        for pattern in EXCLUDE_PATTERNS:
+            if pattern in path_str:
+                return True
+        return False
+
     with zipfile.ZipFile(zip_path, 'w', compression=zipfile.ZIP_DEFLATED) as z:
         base_folder_name = addon_id  # top-level folder must match addon id
         for path in addon_dir.rglob('*'):
             if path.is_dir():
+                continue
+            if should_exclude(path):
                 continue
             rel = path.relative_to(addon_dir)
             arc = str(Path(base_folder_name) / rel)

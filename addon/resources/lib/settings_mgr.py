@@ -115,3 +115,70 @@ def schedule_config():
     scheduled_mode = ["pull","push","bidirectional"][scheduled_mode_idx]
     
     return ScheduleCfg(enabled, mode, on_startup, on_shutdown, delay, scheduled_mode)
+
+# Miscellaneous settings
+def misc_add_to_fav():
+    """Whether to add this addon to favourites"""
+    return _get_addon().getSettingBool("misc_add_to_fav")
+
+def misc_set_add_to_fav(value: bool):
+    """Set the misc_add_to_fav setting"""
+    _get_addon().setSettingBool("misc_add_to_fav", value)
+
+def misc_keep_first():
+    """Whether to keep this addon as first in favourites"""
+    return _get_addon().getSettingBool("misc_keep_first")
+
+def misc_group_addons_top():
+    """Whether to group all addon shortcuts at the top"""
+    return _get_addon().getSettingBool("misc_group_addons_top")
+
+def misc_sort_addons():
+    """How to sort addon shortcuts: none, az, za, or manual"""
+    sort_idx = int(_get_addon().getSetting("misc_sort_addons") or "0")
+    return ["none", "az", "za", "manual"][sort_idx]
+
+def sync_misc_add_to_fav_state():
+    """Sync misc_add_to_fav setting with actual favourites.xml state"""
+    try:
+        import xbmcvfs
+        import os
+        try:
+            from .xmlio import parse_favourites_xml
+            from .reorder import SELF_ACTIONS
+        except ImportError:
+            from xmlio import parse_favourites_xml
+            from reorder import SELF_ACTIONS
+        
+        profile_path = xbmcvfs.translatePath("special://profile")
+        fav_path = os.path.join(profile_path, "favourites.xml")
+        
+        if not os.path.exists(fav_path):
+            # No favourites file, set to False
+            if misc_add_to_fav():
+                misc_set_add_to_fav(False)
+                log_info("Synced misc_add_to_fav: False (no file)")
+            return
+        
+        # Read and check if self shortcut exists
+        with open(fav_path, 'rb') as f:
+            xml_bytes = f.read()
+        
+        entries = parse_favourites_xml(xml_bytes)
+        
+        has_self = any(e.action in SELF_ACTIONS for e in entries)
+        current_setting = misc_add_to_fav()
+        
+        # Sync setting to match reality
+        if has_self != current_setting:
+            misc_set_add_to_fav(has_self)
+            log_info(f"Synced misc_add_to_fav: setting={current_setting} -> actual={has_self}")
+        else:
+            log_info(f"misc_add_to_fav already in sync: {current_setting}")
+    
+    except Exception as e:
+        try:
+            from .logutil import log_error, kvfmt
+        except ImportError:
+            from logutil import log_error, kvfmt
+        log_error(kvfmt(event="sync_add_to_fav_failed", error=str(e)))

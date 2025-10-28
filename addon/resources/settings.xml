@@ -40,7 +40,7 @@
   </category>
   <category id="conflict" label="Conflict Policy">
     <setting id="conflict_policy" type="enum" label="Default policy for bidirectional" values="Prefer Cloud|Prefer Local|Bidirectional Merge|Manual Review" default="0"/>
-    <setting id="scheduled_conflict" type="enum" label="When conflict occurs on schedule" values="Prefer Cloud|Prefer Local|Skip & notify" default="0"/>
+    <setting id="scheduled_conflict" type="enum" label="When conflict occurs on schedule" values="Prefer Cloud|Prefer Local|Skip &amp; notify" default="0"/>
   </category>
   <category id="backups" label="Backups">
     <setting id="local_backups" type="bool" label="Enable local backups" default="true"/>
@@ -55,6 +55,14 @@
     <setting id="log_level" type="enum" label="Log level" values="INFO|DEBUG" default="0"/>
     <setting id="log_network" type="bool" label="Include network trace (redacted)" default="false"/>
     <setting id="log_retention_days" type="number" label="Log retention (days)" default="7" option="int" min="1" max="30"/>
+  </category>
+  <category id="misc" label="Miscellaneous">
+    <setting id="misc_add_to_fav" type="bool" label="Show addon in Favourites" default="false"/>
+    <setting id="misc_keep_first" type="bool" label="Keep as first (if present)" default="false" visible="eq(-1,true)"/>
+    <setting id="misc_group_addons_top" type="bool" label="Group add-ons at top" default="false"/>
+    <setting id="misc_sort_addons" type="enum" label="Sort add-ons by" values="None|A-Z|Z-A|Manual" default="0"/>
+    <setting id="misc_manual_order" type="action" label="Manual order editor..." action="RunScript(special://home/addons/plugin.service.favourites-sync/resources/lib/ui_manual_order.py)" visible="eq(-1,3)" option="close"/>
+    <setting id="misc_run_reorder_now" type="action" label="Reorder Favourites now" action="RunScript(special://home/addons/plugin.service.favourites-sync/resources/lib/reorder_action.py)" option="close"/>
   </category>
   <category id="internal" label="Internal" visible="false">
     <setting id="first_run_done" type="bool" default="false" visible="false"/>

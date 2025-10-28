@@ -1,7 +1,7 @@
 # Kodi Favourites Sync (Cloud)
 
 Addon ID: `plugin.service.favourites-sync`  
-Version: 1.0.47
+Version: 1.0.48
 
 **Sync your Kodi favorites across multiple devices using cloud storage.**
 
@@ -13,17 +13,17 @@ This addon automatically synchronizes your Kodi favorites (favourites.xml) to a 
 Install both addons for complete functionality:
 
 1. **Service Addon** (background sync):
-   - Download `plugin.service.favourites-sync-1.0.47.zip`
+   - Download `plugin.service.favourites-sync-1.0.48.zip`
    - Kodi: **Settings** → **Add-ons** → **Install from zip file**
    
 2. **Launcher Addon** (RUN button + manual sync):
-   - Download `plugin.program.favourites-sync-1.0.46.zip`
+   - Download `plugin.program.favourites-sync-1.0.1.zip`
    - Install the same way
    - Depends on service addon (will install automatically if missing)
 
 ### Background-Only Installation
 If you only want automatic scheduled syncs without manual control:
-- Install only `plugin.service.favourites-sync-1.0.47.zip`
+- Install only `plugin.service.favourites-sync-1.0.48.zip`
 
 ### Accessing the Addon
 - **Programs Menu**: Go to **Programs** → **Favourites Sync Launcher**
@@ -52,6 +52,14 @@ This architecture solves the Kodi limitation where service-type addons don't hav
 - **Pull (Cloud→Local)**: Download favorites from cloud to your device
 - **Push (Local→Cloud)**: Upload your favorites to the cloud
 - **Bidirectional**: Three-way merge that intelligently combines changes from both sides
+
+### Miscellaneous Settings
+- **Add to favourites**: Toggle addon shortcut in favourites.xml (two-way sync with actual state)
+- **Keep first entry**: Preserve first favorite during reorder
+- **Group addons at top**: Show addons before other favorites
+- **Sort addons**: None (preserve order), A-Z, Z-A, or Manual (custom order)
+- **Auto-apply**: Settings changes automatically reorder favorites (no manual button click needed)
+- **Profile reload**: Changes become immediately visible after reorder
 
 ### Scheduling Options
 - **On startup only**: Sync when Kodi starts (configurable delay: 2-40 seconds)

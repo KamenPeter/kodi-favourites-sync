@@ -1,7 +1,7 @@
 # Kodi Favourites Sync (Cloud)
 
 Add-on ID: `plugin.service.favourites-sync` (service) + `plugin.program.favourites-sync` (launcher)  
-Version: 1.0.47
+Version: 1.0.48
 
 Synchronise the active profile's `favourites.xml` with a cloud or network location. Supports on-demand and scheduled sync, bidirectional merging, backups, and multiple backend types (WebDAV, HTTP, S3, SFTP, SMB, NFS, Local).
 
@@ -12,6 +12,7 @@ Synchronise the active profile's `favourites.xml` with a cloud or network locati
 - **Security**: HTTPS required, ETag support, redacted logs
 - **Scheduler**: Startup and/or shutdown triggers (no more interval/fixed time)
 - **Three-way merge**: Tracks last synced state for proper deletion detection
+- **Miscellaneous Settings**: Add to favourites toggle (two-way sync), keep first entry, group addons at top, sort options (none/A-Z/Z-A/manual), auto-apply on settings change
 - **Daily log rotation**: Configurable retention (1-30 days)
 - **Local JSON-RPC** for automation (127.0.0.1:8765)
 - **Two-addon architecture**: Service (background) + Launcher (RUN button)
@@ -23,7 +24,7 @@ Synchronise the active profile's `favourites.xml` with a cloud or network locati
 1. **Service Addon** (background sync):
    ```
    Settings → Add-ons → Install from zip
-   Choose: dist/plugin.service.favourites-sync-1.0.47.zip
+   Choose: dist/plugin.service.favourites-sync-1.0.48.zip
    ```
 
 2. **Launcher Addon** (RUN button + manual sync):
@@ -45,7 +46,7 @@ Synchronise the active profile's `favourites.xml` with a cloud or network locati
 
 ### Background-Only Installation
 If you only want automatic scheduled syncs:
-- Install only `dist/plugin.service.favourites-sync-1.0.47.zip`
+- Install only `dist/plugin.service.favourites-sync-1.0.48.zip`
 
 ## Architecture
 
@@ -80,10 +81,10 @@ python tools/build_repo.py
 
 Artifacts:
 
-- `dist/plugin.service.favourites-sync-1.0.47.zip`
+- `dist/plugin.service.favourites-sync-1.0.48.zip`
 - `dist/plugin.program.favourites-sync-1.0.46.zip`
 - `repo-root/addons.xml`, `repo-root/addons.xml.md5`
-- `repo-root/plugin.service.favourites-sync/plugin.service.favourites-sync-1.0.47.zip`
+- `repo-root/plugin.service.favourites-sync/plugin.service.favourites-sync-1.0.48.zip`
 - `repo-root/plugin.program.favourites-sync/plugin.program.favourites-sync-1.0.46.zip`
 - `repo-root/repository.kamen/repository.kamen-1.0.0.zip`
 

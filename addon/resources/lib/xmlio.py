@@ -1,5 +1,7 @@
 import xml.etree.ElementTree as ET
-from typing import List, Tuple, Dict, Any
+import re
+from dataclasses import dataclass
+from typing import List, Tuple, Dict, Any, Optional
 
 
 class Favourite:
@@ -17,6 +19,78 @@ class Favourite:
 		el = ET.Element("favourite", attrib={**self.attrib, "name": self.label})
 		el.text = self.path
 		return el
+
+
+@dataclass
+class FavEntry:
+	"""Enhanced favourite entry with type classification"""
+	name: str            # raw display name (keep BBCode)
+	action: str          # inner text of <favourite>…</favourite>
+	thumb: Optional[str] # optional thumb attribute
+	type: Optional[str] = None  # 'addon' | 'media_item' | 'media_folder' | 'other'
+
+
+# BBCode tag removal for normalized comparison
+BB_TAG_RE = re.compile(r"\[(?:/?(?:COLOR|B|I|LIGHT)[^\]]*)\]", re.I)
+
+def normalize_title(name: str) -> str:
+	"""Remove BBCode tags and normalize for case-insensitive sorting"""
+	s = BB_TAG_RE.sub("", name or "").strip()
+	return s.casefold()
+
+
+# Classification regexes
+ADDON_RUNADDON_RE  = re.compile(r'^RunAddon\("([^"]+)"\)$', re.I)
+ADDON_RUNSCRIPT_RE = re.compile(r'^RunScript\(([^)]+)\)$', re.I)
+MEDIA_PLAY_PLUGIN_RE = re.compile(r'^PlayMedia\("plugin://[^"]+"\)$', re.I)
+MEDIA_PLAY_URL_RE    = re.compile(r'^PlayMedia\("(?:(?:smb|nfs|ftp|http|https|file)://)[^"]+"\)$', re.I)
+MEDIA_FOLDER_RE      = re.compile(r'^ActivateWindow\(\d+,\s*"plugin://[^"]+"[^)]*\)$', re.I)
+
+def classify(entry: FavEntry) -> str:
+	"""Classify a favourite entry by its action type"""
+	a = entry.action.strip()
+	if ADDON_RUNADDON_RE.match(a):
+		return "addon"
+	if ADDON_RUNSCRIPT_RE.match(a):
+		# must reference an addon path to be an addon shortcut
+		if "special://home/addons/" in a or "special://xbmc/addons/" in a:
+			return "addon"
+	if MEDIA_PLAY_PLUGIN_RE.match(a) or MEDIA_PLAY_URL_RE.match(a):
+		return "media_item"
+	if MEDIA_FOLDER_RE.match(a):
+		return "media_folder"
+	return "other"
+
+
+def parse_favourites_xml(xml_bytes: bytes) -> List[FavEntry]:
+	"""Parse favourites.xml into FavEntry objects with type classification"""
+	if not xml_bytes:
+		return []
+	root = ET.fromstring(xml_bytes)
+	validate_root(root)
+	entries: List[FavEntry] = []
+	for fav in root.findall("favourite"):
+		name = fav.attrib.get("name", "").strip()
+		action = (fav.text or "").strip()
+		thumb = fav.attrib.get("thumb")
+		entry = FavEntry(name=name, action=action, thumb=thumb)
+		entry.type = classify(entry)
+		entries.append(entry)
+	return entries
+
+
+def serialize_favourites(entries: List[FavEntry]) -> bytes:
+	"""Serialize FavEntry objects back to XML format"""
+	root = ET.Element("favourites")
+	for entry in entries:
+		attribs = {"name": entry.name}
+		if entry.thumb:
+			attribs["thumb"] = entry.thumb
+		el = ET.Element("favourite", attrib=attribs)
+		el.text = entry.action
+		root.append(el)
+	return ET.tostring(root, encoding="utf-8")
+
 
 
 def validate_root(root: ET.Element) -> None:

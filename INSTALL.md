@@ -5,13 +5,13 @@
 ### Quick Install (Recommended)
 
 1. **Download the ZIPs**:
-   - Service: `dist/plugin.service.favourites-sync-1.0.47.zip`
+   - Service: `dist/plugin.service.favourites-sync-1.0.48.zip`
    - Launcher: `dist/plugin.program.favourites-sync-1.0.1.zip`
    - OTA equivalents live under `repo-root/<addon id>/`
 
 2. **Install the service in Kodi**:
    - Settings → Add-ons → Install from zip file
-   - Select `plugin.service.favourites-sync-1.0.47.zip`
+   - Select `plugin.service.favourites-sync-1.0.48.zip`
    - Wait for "Add-on installed" notification
 
 3. **Install the launcher**:
@@ -58,7 +58,7 @@ python tools/build_repo.py
 
 ### Output Artifacts
 
-- `dist/plugin.service.favourites-sync-1.0.47.zip`
+- `dist/plugin.service.favourites-sync-1.0.48.zip`
 - `dist/plugin.program.favourites-sync-1.0.46.zip`
 - `repo-root/plugin.service.favourites-sync/` (service ZIPs)
 - `repo-root/plugin.program.favourites-sync/` (launcher ZIPs)
@@ -68,7 +68,7 @@ python tools/build_repo.py
 ## Troubleshooting
 
 ### "Failed to unpack archive"
-- Verify you are installing version 1.0.47 (service) or 1.0.46 (launcher) or later
+- Verify you are installing version 1.0.48 (service) or 1.0.46 (launcher) or later
 - Delete cached ZIPs before reinstalling
 - Service ZIP must contain top-level folder `plugin.service.favourites-sync/`
 
@@ -83,7 +83,7 @@ python tools/build_repo.py
 ## Status
 
 ✅ **Ready for Installation**
-- Service version: 1.0.47
+- Service version: 1.0.48
 - Launcher version: 1.0.46
 - Kodi Compatibility: Matrix (19) - Omega (21)
 - Python: 3.x

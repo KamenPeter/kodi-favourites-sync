@@ -370,6 +370,17 @@ def _run(mode: str, dry_run: bool = False, skip_profile_reload: bool = False) ->
                 # Skip reload during scheduled syncs to prevent infinite loop (LoadProfile restarts services)
                 if not skip_profile_reload:
                     try:
+                        # Set flag to prevent startup sync from running after reload
+                        try:
+                            from service import _set_reload_flag
+                            _set_reload_flag()
+                        except Exception:
+                            try:
+                                from .service import _set_reload_flag
+                                _set_reload_flag()
+                            except:
+                                pass  # Flag setting is optional
+                        
                         import json
                         
                         # Get current profile name

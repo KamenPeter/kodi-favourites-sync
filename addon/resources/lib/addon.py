@@ -52,7 +52,7 @@ def main():
         "Dry-run (Preview)",
         "Restore from Backup…",
         "Last Sync Status",
-        "Add to Favourites",
+        "Refresh Profile",
         "Settings",
     ]
     
@@ -109,6 +109,17 @@ def main():
         
         # Reload favourites after restore - use LoadProfile to force reload
         try:
+            # Set flag to prevent startup sync from running after reload
+            try:
+                from service import _set_reload_flag
+                _set_reload_flag()
+            except Exception:
+                try:
+                    from .service import _set_reload_flag
+                    _set_reload_flag()
+                except:
+                    pass  # Flag setting is optional
+            
             current_profile = xbmc.getInfoLabel('System.ProfileName')
             xbmc.executebuiltin(f'LoadProfile({current_profile})')
         except Exception:
@@ -124,50 +135,21 @@ def main():
         msg = f"Last: {st.get('last_run','-')}\nResult: {st.get('result','-')}\nChanged: {st.get('changed_items',0)}"
         dialog.ok("Last Sync Status", msg)
     elif choice == 6:
-        # Add to Favourites
-        import xbmc
-        addon_id = addon.getAddonInfo('id')
-        addon_name = addon.getAddonInfo('name')
-        
-        # Build the favourite entry - just the script path
-        script_path = f"special://home/addons/{addon_id}/resources/lib/addon.py"
-        
-        # Manually edit favourites.xml to include thumb attribute
-        # (JSON-RPC doesn't support thumb parameter)
+        # Refresh Profile
         try:
-            import xbmcvfs
-            profile = xbmcvfs.translatePath("special://profile/")
-            fav_file = os.path.join(profile, "favourites.xml")
-            
-            # Get absolute path to addon icon
-            addon_home = xbmcvfs.translatePath(f"special://home/addons/{addon_id}/")
-            addon_icon = os.path.join(addon_home, "icon.png")
-            
-            # Read existing favourites
-            if os.path.exists(fav_file):
-                with open(fav_file, 'r', encoding='utf-8') as f:
-                    content = f.read()
-            else:
-                content = '<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>\n<favourites>\n</favourites>'
-            
-            # Check if already exists
-            if addon_name in content:
-                dialog.notification("Add to Favourites", "Already in favourites!", xbmcgui.NOTIFICATION_INFO, 3000)
-            else:
-                # Add new favourite before </favourites>
-                favourite_cmd = f"RunScript({script_path})"
-                new_fav = f'    <favourite name="{addon_name}" thumb="{addon_icon}">{favourite_cmd}</favourite>\n'
-                content = content.replace('</favourites>', new_fav + '</favourites>')
-                
-                # Write atomically
-                tmp = fav_file + ".tmp"
-                with open(tmp, 'w', encoding='utf-8') as f:
-                    f.write(content)
-                os.replace(tmp, fav_file)
-                
-                dialog.notification("Add to Favourites", "Added successfully!", xbmcgui.NOTIFICATION_INFO, 3000)
-        except Exception as e:
-            dialog.ok("Error", f"Failed to add to favourites:\n{str(e)}")
+            from .reorder import refresh_kodi_profile
+        except ImportError:
+            from reorder import refresh_kodi_profile
+        
+        log_info("Refreshing Kodi profile...")
+        success = refresh_kodi_profile(set_reload_flag=True)
+        
+        if success:
+            dialog.notification("Refresh Profile", "Profile reloaded successfully!", xbmcgui.NOTIFICATION_INFO, 3000)
+            log_info("Profile refresh completed")
+        else:
+            dialog.notification("Refresh Profile", "Failed to reload profile", xbmcgui.NOTIFICATION_ERROR, 3000)
+            log_info("Profile refresh failed")
     elif choice == 7:
         open_settings()
         log_info("settings_opened")
