@@ -256,6 +256,129 @@ def _release_lock():
         pass
 
 
+def _apply_reordering(merged_list: list) -> bytes:
+    """
+    Apply local reordering rules (grouping, sorting, add-to-fav) to merged favourites.
+    This ensures that after sync, the local file respects user's organization preferences.
+    
+    Args:
+        merged_list: List of Favourite objects from sync merge
+        
+    Returns:
+        Serialized XML bytes with reordering applied
+    """
+    try:
+        # Import settings and reorder logic
+        try:
+            from .settings_mgr import misc_add_to_fav, misc_keep_first, misc_group_addons_top, misc_sort_addons
+            from .reorder import ensure_self_shortcut, remove_self_shortcuts, apply_manual_order, load_addon_order, normalize_title, SELF_ACTIONS
+            from .xmlio import serialize, normalize, FavEntry
+        except ImportError:
+            from settings_mgr import misc_add_to_fav, misc_keep_first, misc_group_addons_top, misc_sort_addons
+            from reorder import ensure_self_shortcut, remove_self_shortcuts, apply_manual_order, load_addon_order, normalize_title, SELF_ACTIONS
+            from xmlio import serialize, normalize, FavEntry
+        
+        # Convert Favourite objects to FavEntry objects for reordering
+        entries = []
+        for fav in merged_list:
+            entry = FavEntry(
+                name=fav.label,
+                action=fav.path,
+                thumb=fav.attrib.get("thumb") if fav.attrib else None
+            )
+            # Classify the entry
+            from xmlio import classify
+            entry.type = classify(entry)
+            entries.append(entry)
+        
+        # Get settings
+        add_to_fav = misc_add_to_fav()
+        keep_first = misc_keep_first()
+        group_top = misc_group_addons_top()
+        sort_mode = misc_sort_addons()
+        
+        log_info(kvfmt(event="sync_reorder_start", add_to_fav=add_to_fav, keep_first=keep_first, 
+                      group_top=group_top, sort=sort_mode, entries=len(entries)))
+        
+        # Handle add/remove self shortcut
+        if add_to_fav:
+            ensure_self_shortcut(entries)
+        else:
+            remove_self_shortcuts(entries)
+        
+        # Classify entries
+        addons = [e for e in entries if e.type == "addon"]
+        others = [e for e in entries if e.type != "addon"]
+        
+        # Sort addons according to sort mode
+        if sort_mode == "az":
+            addons = sorted(addons, key=lambda e: normalize_title(e.name))
+        elif sort_mode == "za":
+            addons = sorted(addons, key=lambda e: normalize_title(e.name), reverse=True)
+        elif sort_mode == "manual":
+            order = load_addon_order()
+            if order:
+                addons = apply_manual_order(addons, order)
+        
+        # Reconstruct list based on grouping setting
+        if group_top:
+            # Group all addons at top
+            final_entries = addons + others
+        else:
+            # In-place reorder: maintain original positions
+            final_entries = []
+            addon_idx = 0
+            other_idx = 0
+            
+            for entry in entries:
+                if entry.type == "addon":
+                    if addon_idx < len(addons):
+                        final_entries.append(addons[addon_idx])
+                        addon_idx += 1
+                else:
+                    if other_idx < len(others):
+                        final_entries.append(others[other_idx])
+                        other_idx += 1
+            
+            # Add any remaining
+            while addon_idx < len(addons):
+                final_entries.append(addons[addon_idx])
+                addon_idx += 1
+            while other_idx < len(others):
+                final_entries.append(others[other_idx])
+                other_idx += 1
+        
+        # Move self to first if enabled
+        if keep_first and add_to_fav:
+            # Find self and move to first
+            self_idx = None
+            for i, e in enumerate(final_entries):
+                if e.action in SELF_ACTIONS:
+                    self_idx = i
+                    break
+            if self_idx is not None and self_idx > 0:
+                self_entry = final_entries.pop(self_idx)
+                final_entries.insert(0, self_entry)
+        
+        # Convert FavEntry back to Favourite for serialization
+        reordered_list = []
+        for entry in final_entries:
+            attrib = {}
+            if entry.thumb:
+                attrib["thumb"] = entry.thumb
+            fav = xmlio.Favourite(label=entry.name, path=entry.action, attrib=attrib)
+            reordered_list.append(fav)
+        
+        log_info(kvfmt(event="sync_reorder_complete", addons=len(addons), others=len(others)))
+        
+        return serialize(normalize(reordered_list))
+        
+    except Exception as e:
+        log_error(kvfmt(event="sync_reorder_error", error=str(e)))
+        # Fallback to simple serialization if reordering fails
+        return xmlio.serialize(xmlio.normalize(merged_list))
+
+
 def _run(mode: str, dry_run: bool = False, skip_profile_reload: bool = False) -> dict:
     status = {"last_run": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
               "last_mode": mode, "result": "error", "changed_items": 0, "error": None}
@@ -322,7 +445,10 @@ def _run(mode: str, dry_run: bool = False, skip_profile_reload: bool = False) ->
 
         if merged_list is None:
             merged_list = []
-        output_bytes = xmlio.serialize(xmlio.normalize(merged_list))
+        
+        # Apply local reordering rules to merged result before finalizing
+        # This ensures grouping/sorting settings are respected after sync
+        output_bytes = _apply_reordering(merged_list)
 
         if dry_run or mode == "dryrun":
             status.update({

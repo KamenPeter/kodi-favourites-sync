@@ -1,5 +1,69 @@
 # Changelog
 
+## 1.0.65 (2025-10-29) - Service Addon
+
+**FEATURE: Apply Reordering Rules After Sync**
+
+**Problem:**
+After syncing favourites from the cloud (pull or bidirectional mode), the sync would merge changes but then write the raw merged result to `favourites.xml`. This ignored local reordering settings like:
+- `misc_group_addons_top` (group addon shortcuts at top)
+- `misc_sort_addons` (alphabetical or manual sorting)
+- `misc_add_to_fav` (add/remove self shortcut)
+- `misc_keep_first` (keep self shortcut first)
+
+On the next sync, the local file would differ from the cloud because reordering happened **after** the sync wrote, creating an endless diff cycle.
+
+**Solution:**
+
+Added `_apply_reordering()` function that runs **after merge but before writing** `LOCAL_FAV`:
+
+```python
+def _apply_reordering(merged_list: list) -> bytes:
+    """
+    Apply local reordering rules (grouping, sorting, add-to-fav) to merged favourites.
+    This ensures that after sync, the local file respects user's organization preferences.
+    """
+    # 1. Convert Favourite → FavEntry with classification
+    # 2. Apply add/remove self shortcut
+    # 3. Separate addons from others
+    # 4. Sort addons (az/za/manual/none)
+    # 5. Reconstruct with grouping (top or in-place)
+    # 6. Move self first if enabled
+    # 7. Convert back to Favourite → serialize
+```
+
+**Integration in sync pipeline (line ~328):**
+```python
+if merged_list is None:
+    merged_list = []
+
+# Apply local reordering rules to merged result before finalizing
+# This ensures grouping/sorting settings are respected after sync
+output_bytes = _apply_reordering(merged_list)
+```
+
+**Benefits:**
+- ✅ Grouping/sorting preferences survive cloud sync
+- ✅ No more endless diff cycles between local and cloud
+- ✅ Consistent favourites layout across sync operations
+- ✅ Self shortcut positioning maintained
+
+**Technical Details:**
+The function reuses the same reordering logic from `reorder.py` but applies it to the merged list from sync. It handles:
+1. Classification (addon vs media_item vs media_folder vs other)
+2. Conditional self shortcut management
+3. Addon sorting (alphabetical or manual order)
+4. Grouping modes (top or in-place)
+5. Keep-first positioning
+
+**Logs:**
+```
+event=sync_reorder_start add_to_fav=true keep_first=true group_top=true sort=az entries=15
+event=sync_reorder_complete addons=8 others=7
+```
+
+---
+
 ## 1.0.64 (2025-10-28) - Service Addon
 
 **CRITICAL FIX: RPC Server Graceful Shutdown**

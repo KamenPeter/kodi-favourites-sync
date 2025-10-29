@@ -1,3 +1,10 @@
+v1.0.65 (2025-10-29)
+- FEATURE: Sync now applies local reordering rules after merge
+- Enhanced: Added _apply_reordering() function in sync pipeline
+- Enhanced: Grouping, sorting, and add-to-fav settings now preserved after cloud sync
+- Fixed: Future syncs no longer overwrite organized favourites with unordered cloud data
+- Result: Your addon grouping and sorting preferences survive cloud sync operations
+
 v1.0.64 (2025-10-28)
 - CRITICAL FIX: RPC server now shuts down gracefully
 - Fixed: Added stop_server() function to properly shutdown HTTP server
