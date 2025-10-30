@@ -150,7 +150,13 @@ def normalize(favs: List[Favourite]) -> List[Favourite]:
 def merge_sets(local: List[Favourite], remote: List[Favourite], last_synced: List[Favourite] = None,
 			   prefer: str = "newer", local_mtime: float = 0.0, remote_mtime: float = 0.0) -> Tuple[List[Favourite], Dict[str, Any]]:
 	"""
-	Three-way merge: local, remote, and last_synced states.
+	Three-way merge: local, remote, and last_synced (BASE) states.
+	
+	This implements proper 3-way merge to handle deletions correctly:
+	- If item exists in BASE but deleted locally → propagate deletion to remote
+	- If item exists in BASE but deleted remotely → propagate deletion to local
+	- If item added on both sides → merge (no conflict)
+	- If item modified on both sides → resolve using prefer policy
 	
 	prefer can be:
 	  - "cloud"  → prefer remote on conflicts
@@ -159,7 +165,7 @@ def merge_sets(local: List[Favourite], remote: List[Favourite], last_synced: Lis
 
 	Returns: (merged_list, stats={'added':int,'changed':int,'removed':int, 'added_items':list, 'changed_items':list, 'removed_items':list})
 	"""
-	stats = {"added": 0, "changed": 0, "removed": 0, "added_items": [], "changed_items": [], "removed_items": []}
+	stats = {"added": 0, "changed": 0, "removed": 0, "added_items": [], "changed_items": [], "removed_items": [], "merge_decisions": []}
 	
 	# Build indices for all three states
 	idx_local = {f.key: f for f in local}
@@ -176,70 +182,100 @@ def merge_sets(local: List[Favourite], remote: List[Favourite], last_synced: Lis
 		in_local = key in idx_local
 		in_remote = key in idx_remote
 		
+		label = key[0]  # Extract label for logging
+		
 		# Decision matrix for three-way merge
 		
 		if in_last and not in_local and in_remote:
 			# DELETION DETECTED: Item was synced before, deleted locally, still on remote
 			# Propagate the deletion (don't add to merged list)
 			stats["removed"] += 1
-			stats["removed_items"].append(key[0])  # label/name
+			stats["removed_items"].append(label)
+			stats["merge_decisions"].append(f"DELETE: {label} (deleted locally, removing from remote)")
 			continue
 		
 		if in_last and in_local and not in_remote:
-			# Remote deleted, local kept - keep local (will be pushed to remote)
-			merged.append(idx_local[key])
-			stats["added"] += 1
-			stats["added_items"].append(key[0])
+			# Remote deleted, local kept - propagate remote deletion
+			# This prevents deleted items from reappearing
+			stats["removed"] += 1
+			stats["removed_items"].append(label)
+			stats["merge_decisions"].append(f"DELETE: {label} (deleted remotely, removing from local)")
 			continue
 		
 		if in_last and not in_local and not in_remote:
 			# Both deleted - nothing to do
+			stats["merge_decisions"].append(f"SKIP: {label} (deleted on both sides)")
 			continue
 		
 		if not in_last and in_local and in_remote:
-			# New item on both sides - resolve conflict
+			# New item on both sides - check if identical or conflict
 			if (idx_local[key].attrib != idx_remote[key].attrib):
+				# Different attributes - resolve conflict
 				chosen = idx_remote[key]
 				if prefer == "local":
 					chosen = idx_local[key]
 				elif prefer == "newer":
 					chosen = idx_remote[key] if remote_mtime >= local_mtime else idx_local[key]
 				stats["changed"] += 1
-				stats["changed_items"].append(key[0])
+				stats["changed_items"].append(label)
+				stats["merge_decisions"].append(f"CONFLICT: {label} (added on both, chose {prefer})")
 				merged.append(chosen)
 			else:
-				merged.append(idx_local[key])  # identical
+				# Identical additions
+				merged.append(idx_local[key])
+				stats["added"] += 1
+				stats["added_items"].append(label)
+				stats["merge_decisions"].append(f"ADD: {label} (added identically on both sides)")
 			continue
 		
 		if not in_last and in_local and not in_remote:
-			# New item added locally
+			# New item added locally only
 			merged.append(idx_local[key])
 			stats["added"] += 1
-			stats["added_items"].append(key[0])
+			stats["added_items"].append(label)
+			stats["merge_decisions"].append(f"ADD: {label} (new local item)")
 			continue
 		
 		if not in_last and not in_local and in_remote:
-			# New item added remotely
+			# New item added remotely only
 			merged.append(idx_remote[key])
 			stats["added"] += 1
-			stats["added_items"].append(key[0])
+			stats["added_items"].append(label)
+			stats["merge_decisions"].append(f"ADD: {label} (new remote item)")
 			continue
 		
 		if in_last and in_local and in_remote:
 			# Item exists in all three - check for modifications
-			if (idx_local[key].attrib != idx_remote[key].attrib):
-				# Conflict: both modified
+			local_changed = (idx_local[key].attrib != idx_last[key].attrib)
+			remote_changed = (idx_remote[key].attrib != idx_last[key].attrib)
+			
+			if local_changed and remote_changed:
+				# Both modified - conflict
 				chosen = idx_remote[key]
 				if prefer == "local":
 					chosen = idx_local[key]
 				elif prefer == "newer":
 					chosen = idx_remote[key] if remote_mtime >= local_mtime else idx_local[key]
 				stats["changed"] += 1
-				stats["changed_items"].append(key[0])
+				stats["changed_items"].append(label)
+				stats["merge_decisions"].append(f"CONFLICT: {label} (modified on both, chose {prefer})")
 				merged.append(chosen)
-			else:
-				# No changes or identical
+			elif local_changed:
+				# Only local modified
 				merged.append(idx_local[key])
+				stats["changed"] += 1
+				stats["changed_items"].append(label)
+				stats["merge_decisions"].append(f"UPDATE: {label} (local modification)")
+			elif remote_changed:
+				# Only remote modified
+				merged.append(idx_remote[key])
+				stats["changed"] += 1
+				stats["changed_items"].append(label)
+				stats["merge_decisions"].append(f"UPDATE: {label} (remote modification)")
+			else:
+				# No changes - keep as is
+				merged.append(idx_local[key])
+				stats["merge_decisions"].append(f"KEEP: {label} (unchanged)")
 			continue
 	
 	# Dedup and stable order by label/path

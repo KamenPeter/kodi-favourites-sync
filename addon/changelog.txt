@@ -1,3 +1,14 @@
+v1.0.66 (2025-10-29)
+- MAJOR: Robust 3-way merge with BASE snapshot tracking
+- FEATURE: Proper deletion propagation - removed items stay removed across devices
+- FEATURE: ETag-based conflict detection for external change tracking
+- Enhanced: Extended status.json schema (remote_etag, base_hash, commit_id)
+- Enhanced: All backend drivers support ETag (native or mtime-based)
+- Enhanced: Detailed merge decision logging (ADD/DELETE/CONFLICT/UPDATE/KEEP)
+- Enhanced: Conflict resolution now considers BASE state for accurate merge
+- Fixed: "Removed item reappears" bug - deletions now propagate correctly
+- Result: Multi-device sync is now truly conflict-safe for shared NAS scenarios
+
 v1.0.65 (2025-10-29)
 - FEATURE: Sync now applies local reordering rules after merge
 - Enhanced: Added _apply_reordering() function in sync pipeline

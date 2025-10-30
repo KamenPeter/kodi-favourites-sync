@@ -28,6 +28,7 @@ except Exception:
     pass
 
 STATUS_JSON = os.path.join(ADDON_DATA, "status.json")
+BASE_SNAPSHOT = os.path.join(ADDON_DATA, "base_snapshot.xml")
 LOCK_FILE = os.path.join(ADDON_DATA, "sync.lock")
 
 
@@ -83,6 +84,35 @@ def _load_status() -> dict:
             return json.load(f)
     except Exception:
         return {}
+
+
+def _read_base() -> bytes:
+    """Read BASE snapshot (last known common version for 3-way merge)"""
+    try:
+        if os.path.exists(BASE_SNAPSHOT):
+            with open(BASE_SNAPSHOT, "rb") as f:
+                return f.read()
+        return b""
+    except Exception as e:
+        log_error(kvfmt(event="base_read_error", error=str(e)))
+        return b""
+
+
+def _write_base(data: bytes):
+    """Write BASE snapshot atomically"""
+    try:
+        tmp = BASE_SNAPSHOT + ".tmp"
+        with open(tmp, "wb") as f:
+            f.write(data)
+        try:
+            if os.path.exists(BASE_SNAPSHOT):
+                os.remove(BASE_SNAPSHOT)
+        except Exception:
+            pass
+        os.rename(tmp, BASE_SNAPSHOT)
+        log_info(kvfmt(event="base_snapshot_saved", size=len(data)))
+    except Exception as e:
+        log_error(kvfmt(event="base_write_error", error=str(e)))
 
 
 def _load_last_synced_items() -> list:
@@ -399,9 +429,32 @@ def _run(mode: str, dry_run: bool = False, skip_profile_reload: bool = False) ->
 
         last = _load_status()
         last_hash = last.get("last_synced_hash", "")
+        last_remote_etag = last.get("remote_etag", "")
+        current_remote_etag = remote_meta.get("etag", "")
+        
+        # Detect remote changes using ETag
+        remote_changed_externally = (last_remote_etag != "" and 
+                                     current_remote_etag != "" and 
+                                     last_remote_etag != current_remote_etag)
+        
+        if remote_changed_externally:
+            log_info(kvfmt(event="remote_changed_externally", 
+                          last_etag=last_remote_etag, 
+                          current_etag=current_remote_etag))
+        
         local_hash = _hash(local_bytes)
         remote_hash = _hash(remote_bytes)
-        conflict = (local_hash != last_hash and remote_hash != last_hash and mode == "bidirectional")
+        local_changed = (local_hash != last_hash)
+        remote_changed = (remote_hash != last.get("remote_hash", ""))
+        
+        # Conflict: both local and remote changed since last sync
+        conflict = (local_changed and remote_changed and mode == "bidirectional")
+        
+        if conflict:
+            log_info(kvfmt(event="conflict_detected", 
+                          local_changed=local_changed, 
+                          remote_changed=remote_changed,
+                          remote_etag_changed=remote_changed_externally))
         
         # Load last synced items for three-way merge
         last_synced_list = _load_last_synced_items()
@@ -540,6 +593,15 @@ def _run(mode: str, dry_run: bool = False, skip_profile_reload: bool = False) ->
                 log_error(kvfmt(event="upload_error", error=str(e)))
                 raise
 
+        # Calculate hashes for 3-way merge tracking
+        final_local_bytes = _xbmcvfs_read(LOCAL_FAV)
+        final_local_hash = _hash(final_local_bytes)
+        base_hash = _hash(_read_base())
+        
+        # Generate commit_id for this sync operation
+        import uuid
+        commit_id = str(uuid.uuid4())[:8]
+        
         status.update({
             "result": "success",
             "changed_items": changed if changed else (stats.get("added", 0) + stats.get("changed", 0) + stats.get("removed", 0)),
@@ -549,9 +611,15 @@ def _run(mode: str, dry_run: bool = False, skip_profile_reload: bool = False) ->
             "added_items": stats.get("added_items", []),
             "changed_items_list": stats.get("changed_items", []),
             "removed_items": stats.get("removed_items", []),
-            "last_synced_hash": _hash(_xbmcvfs_read(LOCAL_FAV)),
+            "last_synced_hash": final_local_hash,
             "remote_hash": remote_hash,
             "error": None,
+            # Extended schema for 3-way merge and conflict detection
+            "remote_etag": remote_meta.get("etag", ""),
+            "remote_modified_at": remote_meta.get("modified", ""),
+            "base_hash": base_hash,
+            "local_hash": final_local_hash,
+            "commit_id": commit_id,
             # Save last synced items for three-way merge in next sync
             "last_synced_items": [
                 {"label": f.label, "path": f.path, "attrib": f.attrib}
@@ -560,8 +628,23 @@ def _run(mode: str, dry_run: bool = False, skip_profile_reload: bool = False) ->
         })
         _save_status(status)
         
+        # Update BASE snapshot to the merged result for next 3-way merge
+        if merged_list and mode in ("bidirectional", "pull"):
+            base_bytes = xmlio.serialize(xmlio.normalize(merged_list))
+            _write_base(base_bytes)
+            log_info(kvfmt(event="base_updated", commit_id=commit_id))
+        
         # Log detailed changes (requirement #2 from 1.0.33)
-        log_info(kvfmt(event="sync_success", mode=mode, changed=status["changed_items"]))
+        log_info(kvfmt(event="sync_success", mode=mode, changed=status["changed_items"], commit_id=commit_id))
+        
+        # Log merge decisions for debugging
+        if stats.get("merge_decisions"):
+            log_info(f"Merge decisions ({len(stats.get('merge_decisions', []))}):")
+            for decision in stats.get("merge_decisions", [])[:20]:  # Log first 20
+                log_info(f"  {decision}")
+            if len(stats.get("merge_decisions", [])) > 20:
+                log_info(f"  ... and {len(stats.get('merge_decisions', [])) - 20} more decisions")
+        
         if stats.get("added_items"):
             log_info(f"Added items ({len(stats.get('added_items', []))}):")
             for item in stats.get("added_items", []):

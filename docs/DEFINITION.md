@@ -1,1012 +1,359 @@
-\# DEFINITION.md
+# 🧠 AI DEVELOPER PROMPT — Conflict-Safe 3-Way Sync for `plugin.service.favourites-sync`
 
-
-
-\### Kodi Favourites Sync (Cloud)
-
-
-
-\*\*Add-on ID:\*\* `plugin.service.favourites-sync`
-
-\*\*Version:\*\* `1.0.0`
-
-\*\*Provider:\*\* `Kamen`
-
-\*\*Date:\*\* 2025-10-25
-
-\*\*License:\*\* MIT
-
-
+**Role:** Senior Kodi add-on engineer
+**Project:** `plugin.service.favourites-sync`
+**Goal:** Implement robust, conflict-safe bidirectional sync so multiple devices can safely edit the same `favourites.xml` (e.g., shared on NAS). Prevent “removed item reappears” by adding **remote ETag/hash checks** and a **3-way merge** using a **BASE** snapshot.
 
 ---
 
+## 0) Scope
 
+* Modify **sync pipeline** to:
 
-\## 1️⃣ GOALS
+  1. Read **REMOTE** (NAS/cloud), **LOCAL** (current profile file), and **BASE** (last common snapshot).
+  2. Use **remote ETag/hash** to detect external changes and trigger 3-way merge.
+  3. Apply conflict policies: **Prefer Remote**, **Prefer Local**, **Bidirectional Merge** (with deterministic rules).
+  4. Commit changes atomically; update metadata (`status.json`) and **BASE** snapshot.
 
-
-
-The purpose of this Kodi add-on is to \*\*synchronize the active profile’s favourites\*\* (`favourites.xml`) between Kodi and a user-defined \*\*cloud or network location\*\*.
-
-
-
-Users can:
-
-
-
-\* Sync \*\*on demand\*\* or \*\*automatically on a schedule\*\*
-
-\* Choose \*\*pull, push, or bidirectional merge\*\*
-
-\* Store favourites on \*\*cloud storage, NAS, or network share\*\*
-
-\* Control \*\*conflict resolution\*\*, \*\*backups\*\*, and \*\*logging\*\*
-
-
-
-The add-on must be robust, user-friendly, and secure.
-
-It should gracefully handle missing configuration, network failures, and concurrent edits.
-
-
+* Non-goals: GUI redesign; per-profile UI (that’s Part 2); backend drivers beyond required hash/etag reporting.
 
 ---
 
+## 1) File locations & names
 
+* Local favourites:
+  `LOCAL = special://profile/favourites.xml`
 
-\## 2️⃣ FEATURES OVERVIEW
+* Add-on data dir (create if missing):
+  `DATA = special://profile/addon_data/plugin.service.favourites-sync/`
 
+* Files inside `DATA`:
 
+  * `status.json` — per device metadata (see schema below)
+  * `base_snapshot.xml` — last known common version (**BASE**)
+  * `log.txt` — existing log file (already present)
+  * backups like `favourites_YYYYMMDD-HHMMSS.xml.bak` (existing)
 
-| Feature                    | Description                                                   |
-
-| -------------------------- | ------------------------------------------------------------- |
-
-| \*\*On-demand sync\*\*         | Manual trigger via Program Add-on UI                          |
-
-| \*\*Scheduled sync\*\*         | Automatic sync at intervals or fixed times                    |
-
-| \*\*Backend drivers\*\*        | Modular adapters (WebDAV, S3, HTTP(S), SFTP, SMB, NFS, Local) |
-
-| \*\*Conflict policies\*\*      | Prefer Cloud / Prefer Local / Merge / Manual                  |
-
-| \*\*Local \& remote backups\*\* | Timestamped XML backups                                       |
-
-| \*\*Endpoint validation\*\*    | Mandatory before any sync runs                                |
-
-| \*\*Atomic writes\*\*          | Always write to temporary file, then replace                  |
-
-| \*\*Hash tracking\*\*          | Use SHA-256 to detect changes and conflicts                   |
-
-| \*\*JSON-RPC API\*\*           | Remote trigger and status query                               |
-
-| \*\*Multilingual UI\*\*        | English \& Slovak localization                                 |
-
-| \*\*OTA repository ready\*\*   | Supports Kodi’s update mechanism via hosted repo              |
-
-
+* Remote path: provided by active backend driver (SMB/WebDAV/etc.), as configured.
 
 ---
 
+## 2) Metadata schema changes
 
-
-\## 3️⃣ DIRECTORY STRUCTURE
-
-
-
-```
-
-plugin.service.favourites-sync/
-
-├── addon.xml
-
-├── changelog.txt
-
-├── icon.png
-
-├── fanart.jpg
-
-├── README.md
-
-├── resources/
-
-│   ├── settings.xml
-
-│   ├── language/
-
-│   │   ├── resource.language.en\_gb/strings.po
-
-│   │   └── resource.language.sk\_sk/strings.po
-
-│   └── lib/
-
-│       ├── addon.py
-
-│       ├── service.py
-
-│       ├── sync.py
-
-│       ├── xmlio.py
-
-│       ├── settings\_mgr.py
-
-│       ├── rpc.py
-
-│       ├── logutil.py
-
-│       ├── version.py
-
-│       └── drivers/
-
-│           ├── webdav.py
-
-│           ├── s3.py
-
-│           ├── http.py
-
-│           ├── sftp.py
-
-│           ├── smb.py
-
-│           └── local.py
-
-```
-
-
-
----
-
-
-
-\## 4️⃣ SETTINGS SCHEMA
-
-
-
-\### Categories
-
-
-
-| Category                      | Key                            | Type        | Description                                                       |
-
-| ----------------------------- | ------------------------------ | ----------- | ----------------------------------------------------------------- |
-
-| \*\*Cloud Location (Required)\*\* | `backend`                      | enum        | `WebDAV`, `S3`, `HTTP(S)`, `SFTP`, `SMB/NAS`, `NFS`, `Local Path` |
-
-|                               | `endpoint` / `path` / `bucket` | text        | Remote target                                                     |
-
-|                               | `username`, `password`         | credentials | Auth for WebDAV/SFTP/SMB                                          |
-
-|                               | `validate\_button`              | action      | Runs endpoint test                                                |
-
-|                               | `endpoint\_valid`               | bool        | Read-only, must be true to enable sync                            |
-
-| \*\*Scheduling\*\*                | `schedule\_enabled`             | bool        | Enables background service                                        |
-
-|                               | `schedule\_mode`                | enum        | `Interval`, `Fixed time`, `On startup only`                       |
-
-|                               | `interval\_minutes`             | number      | e.g. 60                                                           |
-
-|                               | `fixed\_time\_local`             | time        | e.g. 03:30                                                        |
-
-|                               | `run\_on\_startup`               | bool        | Run at Kodi start                                                 |
-
-|                               | `startup\_delay\_seconds`        | number      | Delay before run                                                  |
-
-|                               | `scheduled\_mode`               | enum        | Default sync direction for scheduler                              |
-
-| \*\*Conflict Policy\*\*           | `conflict\_policy`              | enum        | Default for manual sync                                           |
-
-|                               | `scheduled\_conflict`           | enum        | Behaviour for conflicts in scheduled runs                         |
-
-| \*\*Backups\*\*                   | `local\_backups`                | bool        | Enable local backups                                              |
-
-|                               | `backup\_count`                 | number      | Max backup files                                                  |
-
-| \*\*Advanced\*\*                  | `timeout\_sec`, `retry\_count`   | number      | Networking controls                                               |
-
-| \*\*Logging\*\*                   | `log\_level`, `log\_network`     | enum/bool   | INFO/DEBUG, trace toggle                                          |
-
-
-
-\*\*Note:\*\* Add-on must refuse operation if `endpoint\_valid = false`.
-
-
-
----
-
-
-
-\## 5️⃣ BACKEND DRIVER INTERFACE
-
-
-
-Every backend must inherit the same interface.
-
-Drivers live in `resources/lib/drivers/`.
-
-
-
-```python
-
-class BackendBase:
-
-&nbsp;   """Abstract interface for cloud storage backends."""
-
-
-
-&nbsp;   def stat(self) -> dict:
-
-&nbsp;       """Return metadata: {'etag': str, 'modified\_at': str, 'size': int}.
-
-&nbsp;       Should raise IOError if unreachable."""
-
-&nbsp;       raise NotImplementedError
-
-
-
-&nbsp;   def download(self) -> bytes:
-
-&nbsp;       """Return raw bytes of remote favourites.xml."""
-
-&nbsp;       raise NotImplementedError
-
-
-
-&nbsp;   def upload(self, data: bytes, metadata: dict) -> None:
-
-&nbsp;       """Upload new data to remote path. Should overwrite existing file safely."""
-
-&nbsp;       raise NotImplementedError
-
-
-
-&nbsp;   def copy\_backup(self, backup\_name: str) -> None:
-
-&nbsp;       """Optionally copy current remote file to backup (timestamped) name."""
-
-&nbsp;       pass
-
-```
-
-
-
-\### Example: WebDAV driver
-
-
-
-Implements:
-
-
-
-\* HTTP GET/PUT
-
-\* Basic Auth or Bearer token
-
-\* TLS validation
-
-\* ETag headers (`If-None-Match`)
-
-\* Returns metadata for caching/conflict detection
-
-
-
----
-
-
-
-\## 6️⃣ SYNC LOGIC FLOW
-
-
-
-\### Core Steps (for any run)
-
-
-
-1\. \*\*Validate endpoint\*\*
-
-2\. \*\*Download remote XML\*\* → `remote.xml`
-
-3\. \*\*Read local XML\*\* → `local.xml`
-
-4\. \*\*Compute hashes\*\*
-
-5\. \*\*Compare hashes vs last\_sync metadata\*\*
-
-6\. \*\*Resolve conflicts per policy\*\*
-
-7\. \*\*Write backup (local + optional remote)\*\*
-
-8\. \*\*Write updated file atomically\*\*
-
-9\. \*\*Upload to remote (if push or merge)\*\*
-
-10\. \*\*Update metadata file (`status.json`)\*\*
-
-11\. \*\*Notify user (UI or log)\*\*
-
-
-
-\### Atomic write pattern
-
-
-
-```python
-
-tmp = path + ".tmp"
-
-with open(tmp, "wb") as f:
-
-&nbsp;   f.write(data)
-
-os.replace(tmp, path)
-
-```
-
-
-
----
-
-
-
-\## 7️⃣ CONFLICT POLICIES
-
-
-
-| Policy                  | Description                                              |
-
-| ----------------------- | -------------------------------------------------------- |
-
-| \*\*Prefer Cloud\*\*        | Always replace local file with remote version            |
-
-| \*\*Prefer Local\*\*        | Always upload local file to cloud                        |
-
-| \*\*Bidirectional Merge\*\* | Parse both XMLs, merge favourites by `(label, path)` key |
-
-| \*\*Manual Review\*\*       | Stop, show preview of differences, ask user              |
-
-
-
-Conflict detection logic:
-
-
-
-```python
-
-if local\_hash != last\_synced\_hash and remote\_hash != last\_synced\_hash:
-
-&nbsp;   conflict = True
-
-```
-
-
-
----
-
-
-
-\## 8️⃣ BACKUP STRATEGY
-
-
-
-\### Local backup
-
-
-
-\* File: `favourites\_YYYYMMDD-HHMMSS.xml.bak`
-
-\* Stored in `special://profile/addon\_data/plugin.service.favourites-sync/`
-
-\* Controlled by `backup\_count`
-
-
-
-\### Remote backup
-
-
-
-\* Supported by S3 versioning or WebDAV `COPY` command
-
-
-
----
-
-
-
-\## 9️⃣ JSON-RPC CONTRACT
-
-
-
-Expose RPC interface for integration with other tools.
-
-
-
-| Method                       | Params         | Returns               |                                   |                                                   |
-
-| ---------------------------- | -------------- | --------------------- | --------------------------------- | ------------------------------------------------- |
-
-| `FavouritesSync.Run`         | `{"mode":"pull | push                  | bidirectional", "dry\_run":false}` | Result JSON (`status`, `changed\_items`, `errors`) |
-
-| `FavouritesSync.Status`      | none           | Last sync status JSON |                                   |                                                   |
-
-| `FavouritesSync.Validate`    | none           | Validation result     |                                   |                                                   |
-
-| `FavouritesSync.ListBackups` | none           | List of local backups |                                   |                                                   |
-
-
-
-\*\*Error codes\*\*
-
-
-
-\* 400 → Missing endpoint
-
-\* 401 → Unauthorized
-
-\* 500 → Generic sync failure
-
-
-
----
-
-
-
-\## 🔁 EXAMPLE FLOWS
-
-
-
-\### Example 1 — On-Demand Pull
-
-
-
-```
-
-User selects “Sync Now → Pull”
-
-&nbsp;→ Validate endpoint
-
-&nbsp;→ Download cloud favourites.xml
-
-&nbsp;→ Backup local file
-
-&nbsp;→ Replace local file
-
-&nbsp;→ Update status.json
-
-&nbsp;→ Notify user: “Sync completed successfully.”
-
-```
-
-
-
-\### Example 2 — Scheduled Bidirectional Merge
-
-
-
-```
-
-Service timer triggers (03:30)
-
-&nbsp;→ Load config, check endpoint\_valid
-
-&nbsp;→ Download remote + load local
-
-&nbsp;→ Compute hashes, detect conflict
-
-&nbsp;→ Merge XML (union of favourites)
-
-&nbsp;→ Write new local file, upload merged result
-
-&nbsp;→ Update last\_sync metadata
-
-&nbsp;→ Log summary
-
-```
-
-
-
-\### Example 3 — Manual Review Conflict
-
-
-
-```
-
-Detected change on both sides
-
-&nbsp;→ Open preview dialog:
-
-&nbsp;     Added: 3   Changed: 2   Removed: 0
-
-&nbsp;→ User picks “Apply Merge”
-
-&nbsp;→ Perform merge, save backups, upload merged XML
-
-```
-
-
-
----
-
-
-
-\## 🔐 SECURITY REQUIREMENTS
-
-
-
-\* Use \*\*HTTPS/SFTP\*\* only for remote communication
-
-\* Validate TLS certificates
-
-\* Store credentials in Kodi settings (plaintext warning in docs)
-
-\* Redact passwords in logs
-
-\* Support custom CA path for self-signed certificates
-
-
-
----
-
-
-
-\## 🧩 FILES AND MODULES
-
-
-
-\### `addon.py`
-
-
-
-\* Main Program Add-on entry point.
-
-\* Displays menu:
-
-
-
-&nbsp; \* Pull / Push / Bidirectional / Dry-run
-
-\* Checks endpoint validity before allowing sync.
-
-
-
-\### `service.py`
-
-
-
-\* Background service loop.
-
-\* Reads scheduling configuration.
-
-\* Triggers sync periodically or at startup.
-
-
-
-\### `settings\_mgr.py`
-
-
-
-\* Wraps `xbmcaddon.Addon()`
-
-\* Exposes `is\_endpoint\_valid()`, `schedule\_config()`
-
-\* Opens Kodi settings window on request
-
-
-
-\### `sync.py`
-
-
-
-\* Core synchronization logic.
-
-\* Imports backend dynamically:
-
-
-
-&nbsp; ```python
-
-&nbsp; from .drivers import webdav, s3, http, sftp, smb, local
-
-&nbsp; backend = webdav.Driver(cfg)
-
-&nbsp; ```
-
-\* Handles merge, backups, metadata.
-
-
-
-\### `xmlio.py`
-
-
-
-\* Utility to parse, validate, and merge favourites XMLs.
-
-\* Normalization (ignore whitespace, order).
-
-\* Element-wise merge:
-
-
-
-&nbsp; ```python
-
-&nbsp; key = (label, path)
-
-&nbsp; ```
-
-
-
-\### `logutil.py`
-
-
-
-\* Unified logging with prefixes `\[fav-sync]`.
-
-
-
-\### `rpc.py`
-
-
-
-\* JSON-RPC methods for external integration.
-
-
-
-\### `version.py`
-
-
-
-\* Stores static version info.
-
-
-
-\### `drivers/`
-
-
-
-\* Contains one module per backend implementing `BackendBase`.
-
-
-
----
-
-
-
-\## 🧠 JSON STRUCTURE: STATUS \& METADATA
-
-
-
-`status.json`
-
-Saved under `special://profile/addon\_data/plugin.service.favourites-sync/`
-
-
+### `status.json` (extend if exists)
 
 ```json
-
 {
+  "last_run": "2025-10-25T09:00:00Z",
+  "last_mode": "pull|push|bidirectional",
+  "result": "success|error|skipped",
+  "endpoint_valid": true,
+  "changed_items": 5,
 
-&nbsp; "last\_run": "2025-10-25T09:00:00Z",
+  "remote_etag": "sha256:abcd...",        // NEW: last known remote hash/etag at successful sync
+  "remote_modified_at": "2025-10-25T09:00:00Z", // optional, if driver provides
 
-&nbsp; "last\_mode": "pull",
-
-&nbsp; "result": "success",
-
-&nbsp; "changed\_items": 5,
-
-&nbsp; "endpoint\_valid": true,
-
-&nbsp; "error": null
-
+  "base_hash": "sha256:...",              // NEW: hash of base_snapshot.xml for sanity
+  "local_hash": "sha256:...",             // NEW: local favourites hash at last success
+  "commit_id": "deviceA-20251025-090000"  // NEW: informational, last writer ID (hostname + time)
 }
-
 ```
 
-
+* **remote_etag** must be compared before any push.
+* **base_hash** helps sanity-check that BASE exists and is consistent.
 
 ---
 
+## 3) Backend driver contract (minimal additions)
 
+Ensure each driver (SMB/WebDAV/S3/…) provides a **remote hash/etag** via `stat()` and returns bytes via `download()`:
 
-\## 🧭 UI LOGIC
+```python
+class BackendBase:
+    def stat(self) -> dict:
+        """
+        Returns metadata, minimally:
+          {
+            "etag": "sha256:...." or an ETag-like value (opaque string),
+            "modified_at": "2025-10-25T09:00:00Z",  # optional
+            "size": 1234                             # optional
+          }
+        Must raise on unreachable.
+        """
+        ...
 
-
-
-\### Main Menu
-
-
-
+    def download(self) -> bytes: ...
+    def upload(self, data: bytes, metadata: dict) -> None: ...
+    def copy_backup(self, backup_name: str) -> None: pass
 ```
 
-▶ Sync Now
-
-▶ Restore from Backup…
-
-▶ Last Sync Status
-
-▶ Settings
-
-```
-
-
-
-\### Dialog messages
-
-
-
-\* Missing endpoint:
-
-
-
-&nbsp; > “Cloud favourites location is not configured.
-
-&nbsp; > Open Settings → Cloud Location to set it up.”
-
-
-
-\* Dry-run summary:
-
-
-
-&nbsp; > Added: 3 | Changed: 2 | Removed: 0
-
-
+* If native ETag unavailable (e.g., SMB), compute `sha256` of remote bytes after download and surface as `etag`.
 
 ---
 
+## 4) Function signatures & modules to implement/modify
 
+### `resources/lib/sync.py` (core orchestrator)
 
-\## 🧾 LOGGING FORMAT
+```python
+def run_sync(mode: str, policy: str, monitor=None) -> dict:
+    """
+    mode: 'pull' | 'push' | 'bidirectional'
+    policy (for conflicts): 'prefer_remote' | 'prefer_local' | 'merge'
+    Returns summary dict: {
+      'result': 'success'|'skipped'|'error',
+      'changed': bool,
+      'added': int, 'removed': int, 'modified': int,
+      'remote_etag': str, 'local_hash': str
+    }
+    """
 
+def _compute_hash(data: bytes) -> str:
+    """sha256:... helper."""
 
+def _load_status() -> dict: ...
+def _save_status(d: dict) -> None: ...
 
-All logs are key=value format:
+def _read_local() -> bytes: ...
+def _write_local_atomic_with_backup(data: bytes) -> None: ...
 
+def _read_base() -> bytes|None: ...
+def _write_base(data: bytes) -> None: ...
 
+def _fetch_remote(driver) -> tuple[bytes, dict]:
+    """Returns (remote_bytes, remote_stat) where remote_stat['etag'] exists."""
 
+def _commit(remote_bytes: bytes|None, local_bytes: bytes|None, driver, manual_context: bool, skip_profile_reload: bool) -> None:
+    """
+    Writes chosen final 'local_bytes' to LOCAL and uploads 'remote_bytes' if needed.
+    Ensures atomic writes, remote backup if available, and optional profile reload.
+    """
 ```
 
-event=sync\_start mode=pull
+### `resources/lib/xmlio.py` (entry model & merge helpers)
 
-event=cloud\_stat etag=abc123 modified\_at=2025-10-25T08:00Z
+```python
+from dataclasses import dataclass
+@dataclass(frozen=True)
+class FavItem:
+    label: str    # raw 'name' (BBCode preserved)
+    action: str   # inner text
+    thumb: str|None
 
-event=backup\_saved file=favourites\_20251025-0800.xml.bak
+def parse_favourites_xml(xml_bytes: bytes) -> list[FavItem]: ...
+def serialize_favourites(items: list[FavItem]) -> bytes: ...
 
-event=sync\_success duration\_ms=1245 changed=5
-
-event=error type=network timeout=10s retry=1/3
-
+def normalize_key(item: FavItem) -> tuple[str, str]:
+    """Return a stable key for item identity, e.g. (clean_label, action).
+       clean_label may strip BB tags for identity; keep raw label in FavItem."""
 ```
 
+### New merge utilities (in `sync.py` or `xmlio.py`)
 
+```python
+@dataclass
+class Diff3:
+    added_local: set
+    removed_local: set
+    added_remote: set
+    removed_remote: set
+    changed_local: set     # if you later support “changed” semantics
+    changed_remote: set
 
-Stored at:
+def diff3(base: list[FavItem], local: list[FavItem], remote: list[FavItem]) -> Diff3: ...
 
-
-
+def merge3(base: list[FavItem], local: list[FavItem], remote: list[FavItem], policy: str) -> tuple[list[FavItem], dict]:
+    """
+    policy: 'prefer_remote' | 'prefer_local' | 'merge'
+    Returns (merged_items, metrics_dict)
+    """
 ```
-
-special://profile/addon\_data/plugin.service.favourites-sync/log.txt
-
-```
-
-
 
 ---
 
+## 5) Sync algorithm (step by step)
 
+```text
+1) Load config & driver
+2) Read LOCAL bytes; compute local_hash
+3) Load BASE snapshot (if missing, set BASE := LOCAL, base_hash := local_hash)
+4) Fetch REMOTE stat.etag; download REMOTE bytes; compute remote_hash (if etag is not strong)
+5) Compare against status.remote_etag:
+   - If etag changed since last success => remote changed externally
 
-\## ⚙️ OTA REPOSITORY STRUCTURE
+6) Choose flow by mode:
+   a) pull:
+       final := REMOTE
+   b) push:
+       if remote changed since last success:
+           if policy == 'prefer_local': upload LOCAL; else: pull first (or merge)
+       else:
+           upload LOCAL
+   c) bidirectional:
+       Run 3-way merge with BASE, LOCAL, REMOTE
+       (see rules below)
 
-
-
+7) Write LOCAL (atomic + backup) if changed; Upload REMOTE if needed
+8) Update BASE := final merged version
+9) Update status.json: remote_etag (new), base_hash, local_hash, last_run, last_mode, result
+10) Optionally reload profile (manual_context guard)
 ```
 
-repo-root/
+---
 
-&nbsp; addons.xml
+## 6) 3-way merge rules (policy handling)
 
-&nbsp; addons.xml.md5
+Use **identity key** = `normalize_key(item) → (clean_label, action)`.
 
-&nbsp; plugin.service.favourites-sync/
+### Compute changes
 
-&nbsp;   plugin.service.favourites-sync-1.0.0.zip
+* `A := set(keys(base))`
+* `L := set(keys(local))`
+* `R := set(keys(remote))`
 
-&nbsp; repository.kamen/
+For now treat items as **added/removed** by key; (changed) can be added later if you track per-item label/action edits.
 
-&nbsp;   repository.kamen-1.0.0.zip
+### Policy: **Prefer Remote**
 
+* Any **conflict** (same key present in one side removed in the other): choose **REMOTE** state.
+* Result keys = `R ∪ (L \ (conflicting_with_R_removals))`, but in practice simpler:
+
+  * Start from `R`
+  * Include any **local additions** that do **not** conflict with remote removals?
+    For **strict** prefer-remote: **do not include** local-only adds if remote concurrently removed the same key.
+* Ordering:
+
+  * Preserve REMOTE order; append non-conflicting local-only additions at end (optional).
+* Metrics: count adds/removes relative to BASE.
+
+### Policy: **Prefer Local**
+
+* Mirror of above; choose **LOCAL** on conflicts.
+* Ordering: preserve LOCAL order; append remote-only adds at end (optional).
+
+### Policy: **Bidirectional Merge** (default)
+
+* **Additions**: union `L ∪ R`.
+
+* **Removals**: if an item is **removed in either LOCAL or REMOTE** relative to BASE, and not re-added on the other side, it must be **removed**.
+
+* **Conflicts**:
+
+  * If **A contains k**, and `k ∉ L` (local removed) but `k ∈ R` (remote kept/added):
+
+    * If remote changed since last success (**etag changed**): **REMOTE wins removal only if policy says prefer remote on scheduled runs**; otherwise **remove** (remote removal dominates because it’s a deliberate delete) — pick one rule and keep it consistent.
+  * For simplicity adopt rule: **a removal beats a non-change** (i.e., if BASE had it and one side removes while the other side didn’t edit it, treat as removed).
+  * If **both sides add different entries with same key** (rare with our key): choose by `scheduled_conflict` setting, or prefer **newer modified_at** if you track per-item timestamps later.
+
+* **Ordering** strategy (deterministic):
+
+  1. Start from BASE order.
+  2. Remove keys that are removed by either side.
+  3. Insert NEW keys:
+
+     * If present in REMOTE-only: insert at **remote’s relative position** if known; else append.
+     * If present in LOCAL-only: insert at **local’s relative position** if known; else append.
+  4. If both sides introduce different insert positions for the **same** key, break ties by **REMOTE first** (documented rule).
+
+Return:
+
+```python
+merged_items, metrics = {
+    'added': n, 'removed': m, 'kept': k, 'conflicts': c
+}
 ```
 
+---
 
+## 7) Locking (optional but recommended for shared NAS)
 
-\### Repository Add-on
+Before writing to REMOTE:
 
+* Try to create `favourites.xml.lock` (or backend equivalent), containing `{hostname, pid, timestamp}`.
+* If exists and **fresh (<60s)**, **retry later** (skip write).
+* After upload, **remove lock**.
 
+Implement best-effort; do not block forever.
 
-```xml
+---
 
-<addon id="repository.kamen" name="Kamen Repo" version="1.0.0">
+## 8) Commit & reload
 
-&nbsp; <extension point="xbmc.addon.repository" name="Kamen Repo">
+* Use existing atomic write for LOCAL: write to `tmp`, then `os.replace`.
+* For REMOTE: if backend supports server-side copy/backup, call `copy_backup()` **before** upload.
+* After successful commit:
 
-&nbsp;   <info>https://your.domain/repo-root/addons.xml</info>
+  * Update `status.json` fields (`remote_etag`, `base_hash`, `local_hash`, `last_run`, `commit_id`).
+  * If `manual_context=True` and not `skip_profile_reload`, do `xbmc.executebuiltin("LoadProfile(auto)")`; fallback to `Container.Refresh` on failure.
 
-&nbsp;   <checksum>https://your.domain/repo-root/addons.xml.md5</checksum>
+---
 
-&nbsp;   <datadir>https://your.domain/repo-root/</datadir>
+## 9) Logging (add lines)
 
-&nbsp; </extension>
-
-</addon>
+Examples (key=value, single line):
 
 ```
-
-
-
-When hosted, Kodi auto-updates the add-on by reading `addons.xml`.
-
-
-
----
-
-
-
-\## ⚙️ EXAMPLE BUILD FLOW
-
-
-
-1\. `tools/build.py` zips `/addon` → `/dist/plugin.service.favourites-sync-x.y.z.zip`
-
-2\. Copy zip to `repo-root/plugin.service.favourites-sync/`
-
-3\. `tools/make\_addons\_xml.py` regenerates `addons.xml` \& `addons.xml.md5`
-
-4\. Commit \& push to OTA hosting branch (`gh-pages` or S3)
-
-
-
----
-
-
-
-\## 🧩 GIT STRUCTURE RECOMMENDATION
-
-
-
+event=sync_start mode=bidirectional policy=merge
+event=remote_stat etag=E2 size=1234
+event=diff3 added_local=1 removed_local=0 added_remote=0 removed_remote=1
+event=merge_result added=0 removed=1 kept=45 conflicts=0
+event=commit local_changed=true remote_changed=true
+event=sync_success new_remote_etag=E3 local_hash=H3
 ```
 
-kodi-favourites-sync/
-
-├─ addon/                # Source code
-
-├─ dist/                 # Build artifacts
-
-├─ repo-root/            # OTA index
-
-├─ repository.kamen/  # Repository add-on
-
-├─ tools/                # Build scripts
-
-├─ docs/                 # Documentation
-
-└─ .github/workflows/    # CI/CD (optional)
+On detected external change:
 
 ```
-
-
-
-\* Tag releases as `vX.Y.Z`
-
-\* Version bump = edit `addon/addon.xml` + `resources/lib/version.py`
-
-\* CI builds zips, updates repo-root, and publishes OTA index
-
-
+event=remote_changed prev_etag=E1 new_etag=E2 action=merge3
+```
 
 ---
 
+## 10) Tests (must pass)
 
+1. **Readd bug scenario (your case)**
 
-\## 🧪 TEST CASES
+   * A adds movie X; A syncs (E1)
+   * B pulls; B removes X; B syncs (E2)
+   * A syncs: **must NOT** reintroduce X; result should remove X locally and update BASE/etag.
 
+2. **Simultaneous additions (different items)**
 
+   * A adds X (no remote change), B adds Y (no remote change), then both sync in any order: final has X+Y.
 
-| Type         | Test                                        |
+3. **Add vs Remove conflict (same item)**
 
-| ------------ | ------------------------------------------- |
+   * From BASE, A adds X (local-only), B removes X (remote removed) → policy:
 
-| Validation   | Missing endpoint → no sync allowed          |
+     * Prefer Remote → final **without** X
+     * Prefer Local → final **with** X
+     * Merge → **removal wins** (document this; consistent rule)
 
-| Pull         | Download cloud version to local             |
+4. **Ordering determinism**
 
-| Push         | Upload local version to remote              |
+   * Same content, different insert positions on A vs B → final order deterministic (REMOTE priority).
 
-| Merge        | Bidirectional merge with duplicates         |
+5. **Lock respected**
 
-| Conflict     | Detected change both sides → policy applied |
+   * With lock present & fresh: writer backs off and retries/returns skipped.
 
-| Schedule     | Interval and fixed-time triggers            |
+6. **Status and BASE maintained**
 
-| Backup       | Rotation beyond configured limit            |
-
-| Remote       | S3 and WebDAV upload success                |
-
-| Security     | TLS cert rejection works                    |
-
-| Localization | EN/SK UI displayed correctly                |
-
-
-
----
-
-
-
-\## 🔚 SUMMARY
-
-
-
-This add-on’s architecture allows:
-
-
-
-\* Modular backend extensibility
-
-\* Transparent user control
-
-\* Safe synchronization
-
-\* Multi-device compatibility
-
-\* OTA update capability
-
-
-
-Deliverables include:
-
-
-
-\* Source structure
-
-\* Localizations (EN/SK)
-
-\* Configurable settings
-
-\* JSON-RPC API
-
-\* Versioning \& repository model
-
-
+   * After success: `status.remote_etag` equals new etag; `base_snapshot.xml` equals merged content; hashes updated.
 
 ---
 
+## 11) Deliverables
 
-
-✅ \*\*Next Step for AI Developer\*\*
-
-Implement:
-
-
-
-\* WebDAV backend (requests-based GET/PUT with ETag)
-
-\* XML merge utility (`xmlio.py`)
-
-\* Core sync orchestration (`sync.py`)
-
-\* JSON-RPC server (`rpc.py`)
-
-\* Proper log handling and backup rotation
-
-
-
-All other scaffolding (settings, UI, service, structure) already defined here.
-
-
+* Updated `sync.py`, `xmlio.py`, and (if needed) drivers’ `stat()` to provide etag/hash.
+* New/updated `status.json` and `base_snapshot.xml` handling.
+* Unit/integration test snippets or logs proving scenarios above.
+* Log excerpts showing 3-way merge decisions.
 
 ---
 
+## 12) Implementation hints
 
-
-> \*\*End of Definition File — `DEFINITION.md`\*\*
-
-
-
+* If backend can’t provide strong ETag, compute `sha256(remote_bytes)` and use it as `etag`.
+* Keep **FavItem.label** as raw (with BBCode) and use **normalize_key()** for identity (strip BBCode + casefold on label).
+* For performance, cache parsed lists and key sets; XML files are small, so clarity > micro-perf.

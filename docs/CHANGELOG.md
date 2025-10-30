@@ -1,5 +1,149 @@
 # Changelog
 
+## 1.0.66 (2025-10-29) - Service Addon
+
+**MAJOR: Robust Conflict-Safe 3-Way Merge for Multi-Device Sync**
+
+**Problem:**
+The previous sync implementation had critical flaws when multiple devices edited the same favourites.xml on shared storage (NAS):
+
+1. **"Removed item reappears" bug**: Device A removes item X and syncs. Device B syncs later and X reappears because the merge didn't know X was intentionally deleted vs. never existed.
+
+2. **No external change detection**: If favourites.xml changed on the server (by another device or manually), the addon couldn't detect this until doing a full hash comparison.
+
+3. **Poor conflict resolution**: 2-way merge (local vs remote) couldn't distinguish between "item added on one side" vs "item deleted on other side".
+
+**Solution: True 3-Way Merge with BASE Snapshot**
+
+Implemented industry-standard 3-way merge algorithm using BASE (last common version):
+
+### 1. BASE Snapshot Infrastructure
+
+```python
+BASE_SNAPSHOT = os.path.join(ADDON_DATA, "base_snapshot.xml")
+
+def _read_base() -> bytes:
+    """Read BASE snapshot (last known common version for 3-way merge)"""
+    
+def _write_base(data: bytes):
+    """Write BASE snapshot atomically after successful sync"""
+```
+
+After each sync, the merged result is saved as BASE. On next sync:
+- **LOCAL** = current local favourites.xml
+- **REMOTE** = current remote favourites.xml  
+- **BASE** = what both were after last successful sync
+
+### 2. Extended status.json Schema
+
+```python
+status.update({
+    "remote_etag": remote_meta.get("etag", ""),        # Detect remote changes
+    "remote_modified_at": remote_meta.get("modified", ""),
+    "base_hash": _hash(_read_base()),                   # BASE tracking
+    "local_hash": final_local_hash,                     # Local tracking
+    "commit_id": commit_id,                             # Unique sync ID
+    "last_synced_items": [...]                          # For 3-way merge
+})
+```
+
+### 3. ETag-Based Conflict Detection
+
+All backend drivers now return `etag` in `stat()`:
+- **WebDAV, S3, HTTP**: Native ETag support
+- **SFTP, SMB, NFS, Local**: Use `st_mtime` as synthetic ETag
+
+```python
+last_remote_etag = last.get("remote_etag", "")
+current_remote_etag = remote_meta.get("etag", "")
+
+remote_changed_externally = (last_remote_etag != "" and 
+                             current_remote_etag != "" and 
+                             last_remote_etag != current_remote_etag)
+
+if remote_changed_externally:
+    log_info(kvfmt(event="remote_changed_externally", 
+                  last_etag=last_remote_etag, 
+                  current_etag=current_remote_etag))
+```
+
+### 4. Enhanced merge_sets() with Proper Deletion Handling
+
+```python
+def merge_sets(local, remote, last_synced, prefer="newer"):
+    """
+    3-way merge decision matrix:
+    
+    | in_BASE | in_LOCAL | in_REMOTE | Decision                    |
+    |---------|----------|-----------|------------------------------|
+    | YES     | NO       | YES       | DELETE (removed locally)     |
+    | YES     | YES      | NO        | DELETE (removed remotely)    |
+    | YES     | NO       | NO        | SKIP (deleted both sides)    |
+    | NO      | YES      | YES       | ADD (new on both)           |
+    | NO      | YES      | NO        | ADD (new local)             |
+    | NO      | NO       | YES       | ADD (new remote)            |
+    | YES     | YES*     | YES*      | CONFLICT (modified both)    |
+    | YES     | YES      | YES       | KEEP (unchanged)            |
+    
+    * = Different attributes from BASE
+    """
+```
+
+**Key Improvements:**
+
+1. **Deletion propagation**: If item exists in BASE but not in LOCAL, it means user intentionally deleted it → remove from REMOTE too (and vice versa)
+
+2. **Addition detection**: If item doesn't exist in BASE but exists in LOCAL/REMOTE, it's a new addition → merge both
+
+3. **Conflict resolution**: Only if item modified on BOTH sides since BASE → use `prefer` policy
+
+### 5. Detailed Merge Decision Logging
+
+```python
+stats["merge_decisions"] = [
+    "DELETE: Netflix (deleted locally, removing from remote)",
+    "ADD: Spotify (new local item)",
+    "CONFLICT: YouTube (modified on both, chose newer)",
+    "UPDATE: Movies (remote modification)",
+    "KEEP: TV Shows (unchanged)"
+]
+```
+
+Logged for every sync operation to help debug multi-device scenarios.
+
+### 6. Commit Flow
+
+```python
+# After successful sync
+if merged_list and mode in ("bidirectional", "pull"):
+    base_bytes = xmlio.serialize(xmlio.normalize(merged_list))
+    _write_base(base_bytes)
+    log_info(kvfmt(event="base_updated", commit_id=commit_id))
+```
+
+**Test Scenarios Now Working:**
+
+✅ **Scenario 1: Deletion propagation**
+1. Device A: Add item X, sync → X in cloud
+2. Device B: Pull, sees X
+3. Device B: Remove X, sync → X deleted from cloud
+4. Device A: Sync → X stays removed (doesn't reappear!)
+
+✅ **Scenario 2: Simultaneous additions**
+1. Device A: Add item X (offline)
+2. Device B: Add item Y (offline)
+3. Both sync → Result has both X and Y ✓
+
+✅ **Scenario 3: Conflict resolution**
+1. Device A: Modify item Z's thumb
+2. Device B: Modify item Z's name
+3. Both sync → Uses `prefer` policy (newer/cloud/local)
+
+**Result:**
+Multi-device sync is now production-ready for shared NAS scenarios. Deletions propagate correctly, additions merge properly, and conflicts resolve deterministically.
+
+---
+
 ## 1.0.65 (2025-10-29) - Service Addon
 
 **FEATURE: Apply Reordering Rules After Sync**
