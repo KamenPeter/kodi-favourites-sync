@@ -1,6 +1,6 @@
 <settings>
   <category id="profiles" label="Profiles (Multi-Device)">
-    <setting id="profiles_manage" type="action" label="Manage Profiles…" action="RunScript(special://home/addons/plugin.service.favourites-sync/resources/lib/ui_profiles_manage.py)" option="close"/>
+    <setting id="profiles_manage" type="action" label="Manage Profiles…" action="RunScript(special://home/addons/plugin.service.favourites-sync/resources/lib/ui_profiles.py)" option="close"/>
     <setting type="sep"/>
     <setting type="lsep" label="Multi-Profile Sync"/>
     <setting type="label" label="Configure sync settings for each Kodi profile."/>

@@ -1,0 +1,8 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: plugin.service.favourites-sync 1.0.0\n"
+"Language: sk_SK\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+# (Preložené reťazce môžete doplniť neskôr.)

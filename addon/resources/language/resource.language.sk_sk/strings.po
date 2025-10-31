@@ -6,3 +6,52 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 
 # (Preložené reťazce môžete doplniť neskôr.)
+
+# Správa profilov UI
+msgctxt "#32150"
+msgid "Manage Profiles"
+msgstr "Spravovať profily"
+
+msgctxt "#32151"
+msgid "Validate Endpoint"
+msgstr "Overiť koncový bod"
+
+msgctxt "#32152"
+msgid "Add New Profile"
+msgstr "Pridať nový profil"
+
+msgctxt "#32153"
+msgid "Edit Profile:"
+msgstr "Upraviť profil:"
+
+msgctxt "#32154"
+msgid "Backend"
+msgstr "Backend"
+
+msgctxt "#32155"
+msgid "Endpoint"
+msgstr "Koncový bod"
+
+msgctxt "#32156"
+msgid "Sync on Startup"
+msgstr "Synchronizovať pri spustení"
+
+msgctxt "#32157"
+msgid "Sync on Shutdown"
+msgstr "Synchronizovať pri vypnutí"
+
+msgctxt "#32158"
+msgid "Sync Mode"
+msgstr "Režim synchronizácie"
+
+msgctxt "#32159"
+msgid "Conflict Policy"
+msgstr "Politika konfliktov"
+
+msgctxt "#32160"
+msgid "Cross-Add Enabled"
+msgstr "Cross-Add povolený"
+
+msgctxt "#32161"
+msgid "Default Target Profiles"
+msgstr "Predvolené cieľové profily"

@@ -49,12 +49,7 @@ class Driver:
         """Read the file and return its contents"""
         try:
             if not os.path.exists(self.path):
-                # Check if parent directory exists - if not, path is unavailable
-                parent = os.path.dirname(self.path)
-                if parent and not os.path.exists(parent):
-                    # Parent directory doesn't exist - this is a configuration/availability issue
-                    raise IOError(f"Path not accessible: {parent}")
-                # File doesn't exist but parent does - this is first sync, return empty
+                # Return empty favourites if file doesn't exist
                 return b'<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>\n<favourites>\n</favourites>\n'
             
             with open(self.path, 'rb') as f:

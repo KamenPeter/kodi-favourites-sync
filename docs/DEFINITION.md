@@ -1,359 +1,442 @@
-# 🧠 AI DEVELOPER PROMPT — Conflict-Safe 3-Way Sync for `plugin.service.favourites-sync`
+# 🧠 AI DEVELOPER PROMPT — Multi-Profile Awareness & Cross-Profile Add
 
 **Role:** Senior Kodi add-on engineer
 **Project:** `plugin.service.favourites-sync`
-**Goal:** Implement robust, conflict-safe bidirectional sync so multiple devices can safely edit the same `favourites.xml` (e.g., shared on NAS). Prevent “removed item reappears” by adding **remote ETag/hash checks** and a **3-way merge** using a **BASE** snapshot.
+**Goal:** Add **multi-profile awareness** and a **user-prompted cross-add to other profiles** (Option B). No file-watch loops. No cross-removal automation (parked for later). Keep the existing 3-way sync logic intact.
 
 ---
 
-## 0) Scope
+## 🔭 Scope (Phases)
 
-* Modify **sync pipeline** to:
+* **Phase 1 — Profiles Manager (backend only)**
 
-  1. Read **REMOTE** (NAS/cloud), **LOCAL** (current profile file), and **BASE** (last common snapshot).
-  2. Use **remote ETag/hash** to detect external changes and trigger 3-way merge.
-  3. Apply conflict policies: **Prefer Remote**, **Prefer Local**, **Bidirectional Merge** (with deterministic rules).
-  4. Commit changes atomically; update metadata (`status.json`) and **BASE** snapshot.
+  * Discover Kodi profiles, manage a `profiles.json` map, provide secure (optional) credential storage for each profile’s backend.
 
-* Non-goals: GUI redesign; per-profile UI (that’s Part 2); backend drivers beyond required hash/etag reporting.
+* **Phase 2 — “Manage Profiles…” UI**
 
----
+  * One Settings → action opens a custom dialog to edit profiles (backend, endpoint, credentials, schedule flags), and validate endpoints.
 
-## 1) File locations & names
+* **Phase 3 — Cross-Add to Other Profiles (Option B)**
 
-* Local favourites:
-  `LOCAL = special://profile/favourites.xml`
+  * A user-triggered action that, for the currently selected media item, prompts which profiles to add it to, then writes to those profiles’ `favourites.xml`.
+  * No polling. No automatic removals.
+  * Optional “Sync now” after add.
 
-* Add-on data dir (create if missing):
-  `DATA = special://profile/addon_data/plugin.service.favourites-sync/`
-
-* Files inside `DATA`:
-
-  * `status.json` — per device metadata (see schema below)
-  * `base_snapshot.xml` — last known common version (**BASE**)
-  * `log.txt` — existing log file (already present)
-  * backups like `favourites_YYYYMMDD-HHMMSS.xml.bak` (existing)
-
-* Remote path: provided by active backend driver (SMB/WebDAV/etc.), as configured.
+> (A later Phase 4 will hook startup/shutdown multi-profile sync by iterating the profiles map, but you may implement it now if trivial.)
 
 ---
 
-## 2) Metadata schema changes
+## 🗂 Files to create / modify
 
-### `status.json` (extend if exists)
+```
+resources/lib/
+  profiles_mgr.py        # NEW: profile discovery, profiles.json R/W, encryption helpers
+  ui_profiles.py         # NEW: “Manage Profiles” dialog (edit per-profile config)
+  ui_cross_add.py        # NEW: cross-add prompt for picking target profiles
+  context_cross_add.py   # NEW: entry to run cross-add flow (read current selection → dialog)
+  settings_mgr.py        # MODIFY: add “Manage Profiles…” action wiring
+  xmlio.py               # MODIFY: helper to write favourite entry to a given profile path
+  sync.py                # MODIFY: add thin wrapper run_sync_for_profile(profile_name, ...)
+  logutil.py             # MODIFY: add profile=<name> to log helpers (optional convenience)
+```
+
+Also:
+
+* `addon.xml` — add a **script entry-point** (to run cross-add) and a **settings action hook** (see wiring below).
+* `resources/settings.xml` — add a Settings category action: **“Manage Profiles…”** (opens `ui_profiles.py`).
+
+---
+
+## 🧱 Data & security
+
+### 1) `profiles.json` schema (stored per active Kodi profile)
+
+Path:
+`special://profile/addon_data/plugin.service.favourites-sync/profiles.json`
 
 ```json
 {
-  "last_run": "2025-10-25T09:00:00Z",
-  "last_mode": "pull|push|bidirectional",
-  "result": "success|error|skipped",
-  "endpoint_valid": true,
-  "changed_items": 5,
-
-  "remote_etag": "sha256:abcd...",        // NEW: last known remote hash/etag at successful sync
-  "remote_modified_at": "2025-10-25T09:00:00Z", // optional, if driver provides
-
-  "base_hash": "sha256:...",              // NEW: hash of base_snapshot.xml for sanity
-  "local_hash": "sha256:...",             // NEW: local favourites hash at last success
-  "commit_id": "deviceA-20251025-090000"  // NEW: informational, last writer ID (hostname + time)
+  "version": 1,
+  "profiles": {
+    "M":  {
+      "backend": "webdav",
+      "config": {
+        "url": "https://cloud.example.com/remote.php/dav/files/user/favourites.xml",
+        "user": "user",
+        "password": "ENC:base64-blob"   // optional, encrypted (see crypto helpers)
+      },
+      "schedule": { "on_start": true, "on_shutdown": false, "mode": "bidirectional" },
+      "conflict_policy": "merge",
+      "cross_add": { "enabled": true, "auto_targets": ["M1","M2"] }  // used by UI; no automation here
+    },
+    "M1": { "backend": "smb", "config": { "path": "\\\\nas\\m1\\favourites.xml", "user": "nasuser", "password": "" }, ... },
+    "M2": { ... },
+    "T":  { ... }
+  }
 }
 ```
 
-* **remote_etag** must be compared before any push.
-* **base_hash** helps sanity-check that BASE exists and is consistent.
+Notes:
+
+* `password` is **optional** and stored **encrypted** on this device (see below).
+* A profile **exists** if a folder is under `special://userdata/profiles/<ProfileName>/`.
+
+### 2) Crypto helpers (device-local)
+
+* Create `keystore.json` in addon_data with:
+
+  ```json
+  { "salt": "<random-16-bytes-base64>" }
+  ```
+* Derive a local key (e.g., `SHA256(addon_id + machine_id + salt)` → 32 bytes → use Fernet or AES-GCM).
+* Provide:
+
+  ```python
+  def encrypt_secret(plain: str) -> str:  # returns "ENC:<b64>"
+  def decrypt_secret(enc: str) -> str:    # accepts "ENC:...", returns plain
+  ```
+* If crypto lib unavailable, fall back to XOR+base64 with salt (still obfuscation). Document clearly.
 
 ---
 
-## 3) Backend driver contract (minimal additions)
+## 🧰 Phase 1 — `profiles_mgr.py` (backend)
 
-Ensure each driver (SMB/WebDAV/S3/…) provides a **remote hash/etag** via `stat()` and returns bytes via `download()`:
+### Functions
 
 ```python
-class BackendBase:
-    def stat(self) -> dict:
-        """
-        Returns metadata, minimally:
-          {
-            "etag": "sha256:...." or an ETag-like value (opaque string),
-            "modified_at": "2025-10-25T09:00:00Z",  # optional
-            "size": 1234                             # optional
-          }
-        Must raise on unreachable.
-        """
-        ...
+def list_kodi_profiles() -> dict[str, str]:
+    """
+    Returns { profile_name: absolute_profile_dir }
+    Example: { "M": "/.../profiles/M", "M1": "/.../profiles/M1" }
+    """
 
-    def download(self) -> bytes: ...
-    def upload(self, data: bytes, metadata: dict) -> None: ...
-    def copy_backup(self, backup_name: str) -> None: pass
+def profile_favourites_path(profile_name: str) -> str:
+    """Return full path to that profile's favourites.xml."""
+
+def load_profiles_cfg() -> dict:
+    """Load profiles.json (create default structure if missing)."""
+
+def save_profiles_cfg(cfg: dict) -> None:
+    """Atomic write of profiles.json."""
+
+def get_profile_cfg(cfg: dict, profile_name: str) -> dict:
+    """Return cfg for one profile (may be empty dict if not configured)."""
+
+def set_profile_cfg(cfg: dict, profile_name: str, new_cfg: dict) -> dict:
+    """Insert/update profile config; returns modified cfg."""
+
+def encrypt_secret(plain: str) -> str: ...
+def decrypt_secret(maybe_enc: str) -> str: ...
 ```
 
-* If native ETag unavailable (e.g., SMB), compute `sha256` of remote bytes after download and surface as `etag`.
-
----
-
-## 4) Function signatures & modules to implement/modify
-
-### `resources/lib/sync.py` (core orchestrator)
+### Validation helper (reuse existing driver factory)
 
 ```python
-def run_sync(mode: str, policy: str, monitor=None) -> dict:
+def validate_profile_endpoint(pcfg: dict) -> tuple[bool, str]:
     """
-    mode: 'pull' | 'push' | 'bidirectional'
-    policy (for conflicts): 'prefer_remote' | 'prefer_local' | 'merge'
-    Returns summary dict: {
-      'result': 'success'|'skipped'|'error',
-      'changed': bool,
-      'added': int, 'removed': int, 'modified': int,
-      'remote_etag': str, 'local_hash': str
-    }
-    """
-
-def _compute_hash(data: bytes) -> str:
-    """sha256:... helper."""
-
-def _load_status() -> dict: ...
-def _save_status(d: dict) -> None: ...
-
-def _read_local() -> bytes: ...
-def _write_local_atomic_with_backup(data: bytes) -> None: ...
-
-def _read_base() -> bytes|None: ...
-def _write_base(data: bytes) -> None: ...
-
-def _fetch_remote(driver) -> tuple[bytes, dict]:
-    """Returns (remote_bytes, remote_stat) where remote_stat['etag'] exists."""
-
-def _commit(remote_bytes: bytes|None, local_bytes: bytes|None, driver, manual_context: bool, skip_profile_reload: bool) -> None:
-    """
-    Writes chosen final 'local_bytes' to LOCAL and uploads 'remote_bytes' if needed.
-    Ensures atomic writes, remote backup if available, and optional profile reload.
+    Instantiate backend driver from pcfg['backend'], pcfg['config'].
+    Try stat()/download head. Return (ok, message).
     """
 ```
 
-### `resources/lib/xmlio.py` (entry model & merge helpers)
+---
+
+## 🧩 Phase 2 — “Manage Profiles…” UI (`ui_profiles.py`)
+
+### Settings wiring
+
+In `resources/settings.xml`, add in a suitable category (e.g., Cloud or Advanced):
+
+```xml
+<setting id="profiles_manage" type="action" label="Manage Profiles…" option="close"/>
+```
+
+In `settings_mgr.py`, on this action, run:
 
 ```python
-from dataclasses import dataclass
-@dataclass(frozen=True)
-class FavItem:
-    label: str    # raw 'name' (BBCode preserved)
-    action: str   # inner text
-    thumb: str|None
-
-def parse_favourites_xml(xml_bytes: bytes) -> list[FavItem]: ...
-def serialize_favourites(items: list[FavItem]) -> bytes: ...
-
-def normalize_key(item: FavItem) -> tuple[str, str]:
-    """Return a stable key for item identity, e.g. (clean_label, action).
-       clean_label may strip BB tags for identity; keep raw label in FavItem."""
+import xbmc
+xbmc.executebuiltin(f'RunScript({addon_id}, action=manage_profiles)')
 ```
 
-### New merge utilities (in `sync.py` or `xmlio.py`)
+And in `addon.py` (or a small router), parse `sys.argv` / plugin params:
+
+* if `action=manage_profiles` → call `ui_profiles.open_dialog()`.
+
+### Dialog behavior
+
+* List discovered Kodi profiles in a table:
+
+  ```
+  Name   Backend   OnStart   OnShutdown   Policy    [Edit]
+  M      WebDAV    ✓         –            Merge     [Edit]
+  M1     SMB       –         ✓            Merge     [Edit]
+  M2     S3        ✓         ✓            PreferLocal [Edit]
+  T      WebDAV    –         –            Merge     [Edit]
+  ```
+* Buttons:
+
+  * **Edit** → open sub-dialog (fields below)
+  * **Validate** (per profile)
+  * **Save** and **Close**
+
+**Edit profile** sub-dialog fields (dynamic by backend):
+
+* Backend type (enum): WebDAV | S3 | HTTP(S) | SFTP | SMB/NAS | NFS | Local Path
+* Endpoint fields (url/path/bucket/etc.)
+* Credentials (user / password text boxes; mask password; store encrypted if not empty)
+* Schedule: on_start (bool), on_shutdown (bool), mode (enum pull/push/bidirectional)
+* Conflict policy (enum): prefer_remote / prefer_local / merge
+* Cross-add (enabled bool), default auto_targets (multi-select) — affects the prompt defaults only
+* **Validate** button → calls `profiles_mgr.validate_profile_endpoint()`, shows toast
+* Save → writes to `profiles.json` (atomic), toast success
+
+> Do not run any sync here; only validate and save.
+
+---
+
+## ➕ Phase 3 — Cross-Add to Other Profiles (Option B)
+
+### UX & flow
+
+* User is browsing any media list in Kodi.
+* User triggers **“Add to favourites (for other profiles)…”**.
+* Dialog lists `profiles.json` entries with `cross_add.enabled = true`.
+* User selects targets and clicks OK.
+* Add-on **appends** a `<favourite>` entry to each selected profile’s favourites.xml (atomic, with backup).
+* Optional checkbox “Sync selected profiles now” → if checked, call `run_sync_for_profile()` for each target with `skip_profile_reload=True`.
+
+### Invocation options (choose at least one)
+
+**A. Program Add-on entry**
+
+* Inside the add-on’s own menu, add: **“Add to favourites for other profiles…”**
+* When clicked while a list item is focused, use:
+
+  ```python
+  label = xbmc.getInfoLabel('ListItem.Label')
+  path  = xbmc.getInfoLabel('ListItem.FolderPath') or xbmc.getInfoLabel('ListItem.FileNameAndPath')
+  thumb = xbmc.getInfoLabel('ListItem.Art(thumb)')
+  ```
+
+  (If no selection context, show a helpful message.)
+
+**B. Script entry (for context mapping / keymap)**
+
+* In `addon.xml`, add a `xbmc.python.script` entry point so users (or skins) can bind it to context menu / keymap:
+
+  ```xml
+  <extension point="xbmc.python.script" library="resources/lib/context_cross_add.py">
+    <provides>executable</provides>
+  </extension>
+  ```
+* Running `RunScript(plugin.service.favourites-sync, action=cross_add_current)` calls `ui_cross_add.open_for_current_selection()`.
+
+> We avoid relying on Kodi’s skin-specific context menu hooks; the script route plus keymap binding is portable.
+
+### `ui_cross_add.py` (dialog)
 
 ```python
-@dataclass
-class Diff3:
-    added_local: set
-    removed_local: set
-    added_remote: set
-    removed_remote: set
-    changed_local: set     # if you later support “changed” semantics
-    changed_remote: set
-
-def diff3(base: list[FavItem], local: list[FavItem], remote: list[FavItem]) -> Diff3: ...
-
-def merge3(base: list[FavItem], local: list[FavItem], remote: list[FavItem], policy: str) -> tuple[list[FavItem], dict]:
-    """
-    policy: 'prefer_remote' | 'prefer_local' | 'merge'
-    Returns (merged_items, metrics_dict)
-    """
+def open_for_current_selection():
+    # 1) Read current ListItem.* labels → build FavItem(label, action/path, thumb)
+    # 2) Load profiles.json → build checkbox list (respect cross_add.enabled, preselect auto_targets)
+    # 3) On OK → for each selected profile:
+    #    - xmlio.append_favourite(profile_name, fav_item)
+    #    - if "sync now" is checked → sync.run_sync_for_profile(profile_name, mode='bidirectional', skip_profile_reload=True)
+    # 4) Toast summary
 ```
 
----
+**Fav entry construction**
 
-## 5) Sync algorithm (step by step)
+* If you can get a plugin URL (e.g., `plugin://...`) prefer:
 
-```text
-1) Load config & driver
-2) Read LOCAL bytes; compute local_hash
-3) Load BASE snapshot (if missing, set BASE := LOCAL, base_hash := local_hash)
-4) Fetch REMOTE stat.etag; download REMOTE bytes; compute remote_hash (if etag is not strong)
-5) Compare against status.remote_etag:
-   - If etag changed since last success => remote changed externally
+  ```
+  <favourite name="Label">PlayMedia("plugin://...")</favourite>
+  ```
+* Else if it’s an add-on, use:
 
-6) Choose flow by mode:
-   a) pull:
-       final := REMOTE
-   b) push:
-       if remote changed since last success:
-           if policy == 'prefer_local': upload LOCAL; else: pull first (or merge)
-       else:
-           upload LOCAL
-   c) bidirectional:
-       Run 3-way merge with BASE, LOCAL, REMOTE
-       (see rules below)
+  ```
+  RunAddon("addon.id")
+  ```
+* Else fallback to:
 
-7) Write LOCAL (atomic + backup) if changed; Upload REMOTE if needed
-8) Update BASE := final merged version
-9) Update status.json: remote_etag (new), base_hash, local_hash, last_run, last_mode, result
-10) Optionally reload profile (manual_context guard)
-```
+  ```
+  ActivateWindow(10025, "plugin://...", return)
+  ```
+* Keep `thumb` if available.
 
----
-
-## 6) 3-way merge rules (policy handling)
-
-Use **identity key** = `normalize_key(item) → (clean_label, action)`.
-
-### Compute changes
-
-* `A := set(keys(base))`
-* `L := set(keys(local))`
-* `R := set(keys(remote))`
-
-For now treat items as **added/removed** by key; (changed) can be added later if you track per-item label/action edits.
-
-### Policy: **Prefer Remote**
-
-* Any **conflict** (same key present in one side removed in the other): choose **REMOTE** state.
-* Result keys = `R ∪ (L \ (conflicting_with_R_removals))`, but in practice simpler:
-
-  * Start from `R`
-  * Include any **local additions** that do **not** conflict with remote removals?
-    For **strict** prefer-remote: **do not include** local-only adds if remote concurrently removed the same key.
-* Ordering:
-
-  * Preserve REMOTE order; append non-conflicting local-only additions at end (optional).
-* Metrics: count adds/removes relative to BASE.
-
-### Policy: **Prefer Local**
-
-* Mirror of above; choose **LOCAL** on conflicts.
-* Ordering: preserve LOCAL order; append remote-only adds at end (optional).
-
-### Policy: **Bidirectional Merge** (default)
-
-* **Additions**: union `L ∪ R`.
-
-* **Removals**: if an item is **removed in either LOCAL or REMOTE** relative to BASE, and not re-added on the other side, it must be **removed**.
-
-* **Conflicts**:
-
-  * If **A contains k**, and `k ∉ L` (local removed) but `k ∈ R` (remote kept/added):
-
-    * If remote changed since last success (**etag changed**): **REMOTE wins removal only if policy says prefer remote on scheduled runs**; otherwise **remove** (remote removal dominates because it’s a deliberate delete) — pick one rule and keep it consistent.
-  * For simplicity adopt rule: **a removal beats a non-change** (i.e., if BASE had it and one side removes while the other side didn’t edit it, treat as removed).
-  * If **both sides add different entries with same key** (rare with our key): choose by `scheduled_conflict` setting, or prefer **newer modified_at** if you track per-item timestamps later.
-
-* **Ordering** strategy (deterministic):
-
-  1. Start from BASE order.
-  2. Remove keys that are removed by either side.
-  3. Insert NEW keys:
-
-     * If present in REMOTE-only: insert at **remote’s relative position** if known; else append.
-     * If present in LOCAL-only: insert at **local’s relative position** if known; else append.
-  4. If both sides introduce different insert positions for the **same** key, break ties by **REMOTE first** (documented rule).
-
-Return:
+### `xmlio.py` additions
 
 ```python
-merged_items, metrics = {
-    'added': n, 'removed': m, 'kept': k, 'conflicts': c
-}
+def append_favourite_to_profile(profile_name: str, item: FavItem) -> None:
+    """
+    Load that profile's favourites.xml → append FavItem → serialize → backup + atomic write.
+    Avoid duplicates: if an entry with same key exists, skip or update.
+    """
+```
+
+Use a stable key `(normalized_label, action)` to detect duplicates.
+
+---
+
+Context Menu Integration (Universal Configuration)
+
+To make the “Add to favourites (for other profiles)…” action globally accessible from any list item in Kodi:
+
+1. Script entry point in addon.xml
+
+Add a standard Kodi script extension so the command can be called from any skin or keymap:
+
+<extension point="xbmc.python.script" library="resources/lib/context_cross_add.py">
+  <provides>executable</provides>
+</extension>
+
+
+Kodi then recognises:
+
+RunScript(plugin.service.favourites-sync, action=cross_add_current)
+
+
+as a valid command.
+
+2. Optional skin integration (for universal context menu support)
+
+Skins can expose the command by including an item in their context-menu XML
+(e.g. DialogContextMenu.xml):
+
+<item>
+    <label>Add to favourites (for other profiles)</label>
+    <onclick>RunScript(plugin.service.favourites-sync, action=cross_add_current)</onclick>
+</item>
+
+
+This lets any Kodi skin surface the option without code changes to other add-ons.
+
+3. Keymap binding (optional user shortcut)
+
+Users may also bind a keyboard or remote key to the same script for instant access:
+
+<keymap>
+  <global>
+    <keyboard>
+      <c>RunScript(plugin.service.favourites-sync, action=cross_add_current)</c>
+    </keyboard>
+  </global>
+</keymap>
+
+
+This universal approach avoids dependencies on specific add-ons and makes the command
+available system-wide.
+
+4. Behaviour (summary)
+
+When invoked, Kodi passes the currently focused ListItem to the script.
+
+The script retrieves ListItem.Label, ListItem.FileNameAndPath, and ListItem.Art(thumb)
+to construct the new favourite entry.
+
+## 🔁 (Optional) Phase 4 — Startup/Shutdown multi-profile sync
+
+In `service.py`, at startup/shutdown events:
+
+```python
+cfg = profiles_mgr.load_profiles_cfg()
+for prof, pcfg in cfg["profiles"].items():
+    if pcfg["schedule"].get("on_start"):    run_sync_for_profile(prof, pcfg["schedule"].get("mode","bidirectional"), skip_profile_reload=True)
+# likewise for on_shutdown
+```
+
+### `sync.py` small wrapper
+
+```python
+def run_sync_for_profile(profile_name: str, mode: str, skip_profile_reload: bool=True) -> dict:
+    """
+    1) Build LOCAL path = that profile's favourites.xml
+    2) Read its backend config from profiles.json
+    3) Instantiate driver and call existing run_sync(mode, policy=pcfg['conflict_policy'], ...)
+    4) Return summary
+    """
 ```
 
 ---
 
-## 7) Locking (optional but recommended for shared NAS)
+## 🔗 addon.xml changes (summary)
 
-Before writing to REMOTE:
+* Ensure your service entry remains.
+* Add a **script** entry for cross-add (Phase 3B):
 
-* Try to create `favourites.xml.lock` (or backend equivalent), containing `{hostname, pid, timestamp}`.
-* If exists and **fresh (<60s)**, **retry later** (skip write).
-* After upload, **remove lock**.
-
-Implement best-effort; do not block forever.
-
----
-
-## 8) Commit & reload
-
-* Use existing atomic write for LOCAL: write to `tmp`, then `os.replace`.
-* For REMOTE: if backend supports server-side copy/backup, call `copy_backup()` **before** upload.
-* After successful commit:
-
-  * Update `status.json` fields (`remote_etag`, `base_hash`, `local_hash`, `last_run`, `commit_id`).
-  * If `manual_context=True` and not `skip_profile_reload`, do `xbmc.executebuiltin("LoadProfile(auto)")`; fallback to `Container.Refresh` on failure.
-
----
-
-## 9) Logging (add lines)
-
-Examples (key=value, single line):
-
-```
-event=sync_start mode=bidirectional policy=merge
-event=remote_stat etag=E2 size=1234
-event=diff3 added_local=1 removed_local=0 added_remote=0 removed_remote=1
-event=merge_result added=0 removed=1 kept=45 conflicts=0
-event=commit local_changed=true remote_changed=true
-event=sync_success new_remote_etag=E3 local_hash=H3
+```xml
+<extension point="xbmc.python.script" library="resources/lib/context_cross_add.py">
+  <provides>executable</provides>
+</extension>
 ```
 
-On detected external change:
-
-```
-event=remote_changed prev_etag=E1 new_etag=E2 action=merge3
-```
+* No need to add a special “context item” extension (varies by skin). The script can be bound via **keymap** or invoked from add-on menu.
 
 ---
 
-## 10) Tests (must pass)
+## ✅ Acceptance tests
 
-1. **Readd bug scenario (your case)**
+1. **Profiles discovery**
 
-   * A adds movie X; A syncs (E1)
-   * B pulls; B removes X; B syncs (E2)
-   * A syncs: **must NOT** reintroduce X; result should remove X locally and update BASE/etag.
+* `profiles.json` created with discovered profiles (at least names + empty configs).
+* “Manage Profiles…” shows all profiles with Edit buttons.
 
-2. **Simultaneous additions (different items)**
+2. **Edit & validate**
 
-   * A adds X (no remote change), B adds Y (no remote change), then both sync in any order: final has X+Y.
+* Saving WebDAV/SMB/S3 config stores credentials (password encrypted as `ENC:...`).
+* “Validate” shows success/failure messages.
 
-3. **Add vs Remove conflict (same item)**
+3. **Cross-add prompt**
 
-   * From BASE, A adds X (local-only), B removes X (remote removed) → policy:
+* From a focused movie/episode/add-on item, run: “Add to favourites (for other profiles)…”
+* Dialog lists M1/M2/T with default selections per `auto_targets`.
+* After OK, those profiles’ `favourites.xml` contain the new `<favourite>` (no duplicates).
+* If “Sync now” checked, run immediate bidirectional sync for selected profiles.
 
-     * Prefer Remote → final **without** X
-     * Prefer Local → final **with** X
-     * Merge → **removal wins** (document this; consistent rule)
+4. **No polling**
 
-4. **Ordering determinism**
+* No idle loops in logs; actions occur only on user commands or schedule events.
 
-   * Same content, different insert positions on A vs B → final order deterministic (REMOTE priority).
+5. **Atomic write & backup**
 
-5. **Lock respected**
+* Each write creates a timestamped backup and uses `os.replace`.
+* Broken writes never corrupt `favourites.xml`.
 
-   * With lock present & fresh: writer backs off and retries/returns skipped.
+6. **Security**
 
-6. **Status and BASE maintained**
+* `profiles.json` stores passwords as `ENC:...`.
+* Decrypt works transparently when invoking backends.
 
-   * After success: `status.remote_etag` equals new etag; `base_snapshot.xml` equals merged content; hashes updated.
+7. **Logging**
 
----
-
-## 11) Deliverables
-
-* Updated `sync.py`, `xmlio.py`, and (if needed) drivers’ `stat()` to provide etag/hash.
-* New/updated `status.json` and `base_snapshot.xml` handling.
-* Unit/integration test snippets or logs proving scenarios above.
-* Log excerpts showing 3-way merge decisions.
+* Key log lines include `profile=<name>` and action summaries (added/validated/written).
 
 ---
 
-## 12) Implementation hints
+## 🧑‍💻 Implementation tips
 
-* If backend can’t provide strong ETag, compute `sha256(remote_bytes)` and use it as `etag`.
-* Keep **FavItem.label** as raw (with BBCode) and use **normalize_key()** for identity (strip BBCode + casefold on label).
-* For performance, cache parsed lists and key sets; XML files are small, so clarity > micro-perf.
+* Use existing `FavItem` dataclass from `xmlio.py`.
+* Normalize keys with “strip BBCode + casefold(label), plus action string” to detect duplicates.
+* UI dialogs can be simple `xbmcgui.Dialog().multiselect()` for profile selection, and `xbmcgui.Dialog().ok()` toasts/alerts.
+* For selection context, rely on `xbmc.getInfoLabel('ListItem.*')`. If no selection, show a helpful message and exit gracefully.
+
+---
+
+## 📦 Deliverables
+
+* New/modified Python modules listed above.
+* Updated `addon.xml`, `resources/settings.xml`.
+* A short run log demonstrating:
+
+  ```
+  event=profiles_discovered count=4
+  event=cross_add start item="The Batman" targets=M1,M2
+  event=append_favourite profile=M1 action="PlayMedia("plugin://...")"
+  event=append_favourite profile=M2 action="PlayMedia("plugin://...")"
+  event=sync_now profiles=M1,M2 result=success
+  ```
+* Screenshots (optional) of “Manage Profiles…” and the cross-add selection dialog.
+
+---
+
+**End of developer prompt.**

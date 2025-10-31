@@ -1,0 +1,238 @@
+import xbmcaddon, xbmc, json, os, datetime
+try:
+    from .logutil import log_info
+except Exception:
+    from logutil import log_info
+
+# Don't create ADDON at module level - defer until needed
+_ADDON = None
+
+def _get_addon():
+    global _ADDON
+    if _ADDON is None:
+        try:
+            _ADDON = xbmcaddon.Addon()
+        except RuntimeError:
+            _ADDON = xbmcaddon.Addon("plugin.service.favourites-sync")
+    return _ADDON
+
+def _get(id_, default=None):
+    return _get_addon().getSetting(id_) or default
+
+def is_endpoint_valid():
+    """Check if endpoint is configured by trying to validate it"""
+    # Check if basic settings are configured
+    backend_idx = int(_get_addon().getSetting("backend") or "0")
+    backend = ["webdav", "s3", "http", "sftp", "smb", "nfs", "local"][backend_idx]
+    
+    if backend == "webdav":
+        url = _get_addon().getSetting("webdav_url") or ""
+        if not url or not url.startswith("https://"):
+            return False
+    
+    elif backend == "local":
+        path = _get_addon().getSetting("local_path") or ""
+        if not path:
+            return False
+    
+    elif backend == "http":
+        get_url = _get_addon().getSetting("http_get") or ""
+        put_url = _get_addon().getSetting("http_put") or ""
+        if not get_url or not put_url:
+            return False
+    
+    elif backend == "s3":
+        endpoint = _get_addon().getSetting("s3_endpoint") or ""
+        bucket = _get_addon().getSetting("s3_bucket") or ""
+        key = _get_addon().getSetting("s3_key") or ""
+        access = _get_addon().getSetting("s3_access") or ""
+        if not endpoint or not bucket or not key or not access:
+            return False
+    
+    elif backend == "sftp":
+        host = _get_addon().getSetting("sftp_host") or ""
+        user = _get_addon().getSetting("sftp_user") or ""
+        path = _get_addon().getSetting("sftp_path") or ""
+        if not host or not user or not path:
+            return False
+    
+    elif backend == "smb":
+        path = _get_addon().getSetting("smb_path") or ""
+        if not path:
+            return False
+    
+    elif backend == "nfs":
+        path = _get_addon().getSetting("nfs_path") or ""
+        if not path:
+            return False
+    
+    else:
+        return False
+    
+    # Settings look configured, now try a quick validation
+    try:
+        from sync import validate_endpoint
+        result = validate_endpoint()
+        return result.get("ok", False)
+    except Exception as e:
+        # Log the error but don't fail
+        try:
+            from logutil import log_error, kvfmt
+            log_error(kvfmt(event="endpoint_check_failed", error=str(e)))
+        except Exception:
+            pass
+        return False
+
+def open_settings(category_id=None):
+    """Open the service addon settings, regardless of which addon calls this function"""
+    try:
+        # Always open the service addon settings explicitly
+        service_addon = xbmcaddon.Addon("plugin.service.favourites-sync")
+        if category_id:
+            service_addon.openSettings()
+        else:
+            service_addon.openSettings()
+    except Exception as e:
+        # Fallback: try without explicit ID
+        log_info(f"Failed to open service settings explicitly: {e}")
+        try:
+            _get_addon().openSettings()
+        except Exception as e2:
+            log_info(f"Failed to open settings via _get_addon: {e2}")
+
+class ScheduleCfg:
+    def __init__(self, enabled, mode, on_startup, on_shutdown, delay, scheduled_mode):
+        self.enabled = enabled
+        self.mode = mode
+        self.on_startup = on_startup
+        self.on_shutdown = on_shutdown
+        self.startup_delay_seconds = delay
+        self.scheduled_mode = scheduled_mode
+
+def schedule_config():
+    enabled = _get_addon().getSettingBool("schedule_enabled")
+    mode_idx = int(_get_addon().getSetting("schedule_mode") or 0)
+    mode = ["startup", "shutdown", "both"][mode_idx]
+    
+    # Determine startup and shutdown flags based on mode
+    on_startup = (mode == "startup" or mode == "both")
+    on_shutdown = (mode == "shutdown" or mode == "both")
+    
+    delay = int(_get_addon().getSetting("startup_delay_seconds") or 5)
+    scheduled_mode_idx = int(_get_addon().getSetting("scheduled_mode") or 0)
+    scheduled_mode = ["pull","push","bidirectional"][scheduled_mode_idx]
+    
+    return ScheduleCfg(enabled, mode, on_startup, on_shutdown, delay, scheduled_mode)
+
+# Miscellaneous settings
+def misc_add_to_fav():
+    """Whether to add this addon to favourites
+    
+    NOTE: This function reads directly from settings.xml to avoid Kodi's caching bug
+    where getSettingBool() returns stale values after UI toggles.
+    """
+    try:
+        import xbmcvfs
+        import xml.etree.ElementTree as ET
+        import os
+        
+        # Get path to settings.xml
+        addon_data = xbmcvfs.translatePath(_get_addon().getAddonInfo("profile"))
+        settings_path = os.path.join(addon_data, "settings.xml")
+        
+        # If settings file doesn't exist, return default
+        if not os.path.exists(settings_path):
+            return False
+        
+        # Parse XML and find misc_add_to_fav setting
+        tree = ET.parse(settings_path)
+        root = tree.getroot()
+        
+        for setting in root.findall('.//setting[@id="misc_add_to_fav"]'):
+            value = setting.text
+            if value:
+                return value.lower() == "true"
+        
+        # Not found, return default
+        return False
+    except Exception:
+        # Fall back to cached API if XML reading fails
+        return _get_addon().getSettingBool("misc_add_to_fav")
+
+def misc_set_add_to_fav(value: bool):
+    """Set the misc_add_to_fav setting"""
+    _get_addon().setSettingBool("misc_add_to_fav", value)
+
+def misc_keep_first():
+    """Whether to keep this addon as first in favourites"""
+    return _get_addon().getSettingBool("misc_keep_first")
+
+def misc_group_addons_top():
+    """Whether to group all addon shortcuts at the top"""
+    return _get_addon().getSettingBool("misc_group_addons_top")
+
+def misc_sort_addons():
+    """How to sort addon shortcuts: none, az, za, or manual"""
+    sort_idx = int(_get_addon().getSetting("misc_sort_addons") or "0")
+    return ["none", "az", "za", "manual"][sort_idx]
+
+def sync_misc_add_to_fav_state():
+    """Sync misc_add_to_fav setting with actual favourites.xml state
+    
+    NOTE: This should NOT be called after settings changes that trigger profile reload,
+    as it will overwrite the user's intended setting change.
+    """
+    try:
+        import xbmcvfs
+        import os
+        try:
+            from .xmlio import parse_favourites_xml
+            from .reorder import SELF_ACTIONS
+        except ImportError:
+            from xmlio import parse_favourites_xml
+            from reorder import SELF_ACTIONS
+        
+        # Check if there was a recent profile reload - if so, skip sync
+        # to avoid overwriting user's settings changes
+        addon_data = xbmcvfs.translatePath(_get_addon().getAddonInfo("profile"))
+        reload_flag_path = os.path.join(addon_data, ".profile_reload_flag")
+        if os.path.exists(reload_flag_path):
+            import time
+            mtime = os.path.getmtime(reload_flag_path)
+            age = time.time() - mtime
+            if age < 10:  # Within last 10 seconds
+                log_info(f"Skipping misc_add_to_fav sync - recent profile reload ({age:.1f}s ago)")
+                return
+        
+        profile_path = xbmcvfs.translatePath("special://profile")
+        fav_path = os.path.join(profile_path, "favourites.xml")
+        
+        if not os.path.exists(fav_path):
+            # No favourites file, set to False
+            if misc_add_to_fav():
+                misc_set_add_to_fav(False)
+                log_info("Synced misc_add_to_fav: False (no file)")
+            return
+        
+        # Read and check if self shortcut exists
+        with open(fav_path, 'rb') as f:
+            xml_bytes = f.read()
+        
+        entries = parse_favourites_xml(xml_bytes)
+        
+        has_self = any(e.action in SELF_ACTIONS for e in entries)
+        current_setting = misc_add_to_fav()
+        
+        # Sync setting to match reality
+        if has_self != current_setting:
+            misc_set_add_to_fav(has_self)
+            log_info(f"Synced misc_add_to_fav: setting={current_setting} -> actual={has_self}")
+        else:
+            log_info(f"misc_add_to_fav already in sync: {current_setting}")
+    
+    except Exception as e:
+        try:
+            from .logutil import log_error, kvfmt
+        except ImportError:
+            from logutil import log_error, kvfmt
+        log_error(kvfmt(event="sync_add_to_fav_failed", error=str(e)))

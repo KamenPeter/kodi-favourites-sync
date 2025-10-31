@@ -6,3 +6,52 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 
 # (You can migrate labels from settings.xml to numeric IDs later.)
+
+# Profile Management UI
+msgctxt "#32150"
+msgid "Manage Profiles"
+msgstr "Manage Profiles"
+
+msgctxt "#32151"
+msgid "Validate Endpoint"
+msgstr "Validate Endpoint"
+
+msgctxt "#32152"
+msgid "Add New Profile"
+msgstr "Add New Profile"
+
+msgctxt "#32153"
+msgid "Edit Profile:"
+msgstr "Edit Profile:"
+
+msgctxt "#32154"
+msgid "Backend"
+msgstr "Backend"
+
+msgctxt "#32155"
+msgid "Endpoint"
+msgstr "Endpoint"
+
+msgctxt "#32156"
+msgid "Sync on Startup"
+msgstr "Sync on Startup"
+
+msgctxt "#32157"
+msgid "Sync on Shutdown"
+msgstr "Sync on Shutdown"
+
+msgctxt "#32158"
+msgid "Sync Mode"
+msgstr "Sync Mode"
+
+msgctxt "#32159"
+msgid "Conflict Policy"
+msgstr "Conflict Policy"
+
+msgctxt "#32160"
+msgid "Cross-Add Enabled"
+msgstr "Cross-Add Enabled"
+
+msgctxt "#32161"
+msgid "Default Target Profiles"
+msgstr "Default Target Profiles"

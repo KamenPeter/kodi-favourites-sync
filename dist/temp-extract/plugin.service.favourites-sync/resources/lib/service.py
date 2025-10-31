@@ -265,13 +265,7 @@ class _Monitor(xbmc.Monitor):
             
             log_info(kvfmt(event="settings_read", state=current_state))
             
-            # Skip if this is the first time (no previous state to compare)
-            if self._last_settings_state is None:
-                log_info(kvfmt(event="settings_first_read_skipping_reorder"))
-                self._last_settings_state = current_state
-                return
-            
-            # Check if misc settings actually changed
+            # Check if misc settings changed
             if self._last_settings_state != current_state:
                 log_info(kvfmt(event="misc_settings_changed", prev=self._last_settings_state, current=current_state))
                 

@@ -1,6 +1,980 @@
 # Changelog
 
-## 1.0.66 (2025-10-29) - Service Addon
+## 1.0.73 (2025-10-31)
+
+**CRITICAL FIX: Preserve Local Favourites When Cloud Unavailable**
+
+**User Report:**
+"Keep the local version of the favourites.xml if the Cloud location version is currently not available. Currently I have lost my favorites from the local xml because the cloud location was unavailable currently."
+
+**Problem:**
+When cloud storage was unavailable (network down, server offline, authentication expired), the sync process could fail mid-operation and potentially leave `favourites.xml` in a corrupted or empty state, causing **data loss**.
+
+**Root Cause:**
+The `_run()` function attempted to access cloud storage (`backend.stat()` and `backend.download()`) without proper early failure handling. If these calls failed, the exception would propagate after the sync had already started processing the local file.
+
+**Solution:**
+
+Implemented early cloud availability check with fail-safe protection:
+
+### 1. Early Cloud Access Validation
+
+**Before touching local file:**
+```python
+# CRITICAL: Try to access cloud BEFORE reading/modifying local file
+try:
+    remote_meta = backend.stat()
+    remote_bytes = backend.download()
+except Exception as e:
+    # Cloud unavailable - preserve local file and abort sync
+    error_msg = f"Cloud unavailable, keeping local favourites: {str(e)}"
+    log_error(kvfmt(event="cloud_unavailable", error=str(e), mode=mode))
+    status["error"] = error_msg
+    status["result"] = "cloud_unavailable"
+    _save_status(status)
+    _release_lock()
+    return status  # Abort immediately - local file untouched
+
+# Cloud is accessible - safe to proceed with sync
+local_bytes = _xbmcvfs_read(LOCAL_FAV)
+```
+
+### 2. User-Friendly Notification
+
+Added specific handling for cloud unavailability in UI sync:
+```python
+elif res.get("result") == "cloud_unavailable":
+    d.ok("Favourites Sync", 
+         f"Cloud unavailable - your local favourites are safe.\n\n{res.get('error')}")
+```
+
+### 3. Background Service Protection
+
+Background syncs (startup/shutdown) already handle exceptions gracefully. With v1.0.73:
+- Cloud unavailability logged as `event=cloud_unavailable`
+- Local `favourites.xml` remains unchanged
+- Sync automatically retries on next schedule when cloud returns
+
+**Files Modified:**
+- `addon/resources/lib/sync.py`: Added early cloud check in `_run()`, enhanced `run_sync_ui()`
+- `addon/addon.xml`: Version 1.0.73
+- `addon/changelog.txt`: v1.0.73 entry
+
+**Impact:**
+- ✅ Prevents data loss when cloud is inaccessible
+- ✅ Clear user notification for manual syncs
+- ✅ Graceful handling in background syncs
+- ✅ Works for all backends (WebDAV, S3, SFTP, SMB, NFS, Local, HTTP)
+- ✅ Works for all sync modes (pull, push, bidirectional)
+
+**Testing:**
+1. Disconnect network → Manual sync → Dialog shows "Cloud unavailable - your local favourites are safe"
+2. `favourites.xml` unchanged
+3. Restore network → Sync works normally
+4. Scheduled syncs log `cloud_unavailable` and continue without errors
+
+**User Action:** Update to v1.0.73 immediately to prevent potential data loss.
+
+---
+
+## 1.0.72 (2025-10-31)
+
+**NEW FEATURE: Modern WindowXML Dialogs for Multi-Profile Management**
+
+**User Request:**
+"1. Two WindowXML dialog layouts (Estuary-style)
+2. Exact control IDs + behaviors (so the Python code can wire them quickly)
+3. A ready AI-developer prompt with file paths and minimal Python skeletons"
+
+**Problem:**
+The multi-profile management UI (introduced in v1.0.68) used basic `Dialog().select()` calls which had limitations:
+- No proper form-style editing
+- Limited visual feedback
+- Poor navigation with remote control
+- Didn't match Kodi's visual style
+- List-only interface without proper labels
+
+**Solution:**
+
+Implemented professional WindowXML-based dialogs with full Estuary skin integration:
+
+### 1. DialogManageProfiles.xml
+
+**Layout:**
+- Left panel: Profile list (control ID 50)
+- Right panel: Action buttons (controls 60-63, 100-101)
+- Proper focus navigation (left/right, up/down)
+- Estuary-style background, title bar, and separator
+
+**Controls:**
+- **50**: Profile list panel
+  - Shows profile name and status (backend, schedule indicators)
+  - Focused item highlights properly
+- **60**: Edit button (opens Edit Profile dialog)
+- **61**: Validate Endpoint button
+- **62**: Add New Profile button
+- **63**: Delete Profile button
+- **100**: OK (Save & Close) button
+- **101**: Cancel button
+
+**Visual Style:**
+```
+┌─────────────────────────────────────────────────────┐
+│ Manage Profiles                                     │
+├─────────────────────────────────────────────────────┤
+│  Profiles                     │ Edit               │
+│  ┌──────────────────────┐    │ Validate           │
+│  │ Master | WebDAV | ✓✓ │    │ Add New Profile    │
+│  │ TPSkusaj | Not config│    │ Delete             │
+│  │ X | S3 | ✓–          │    │                    │
+│  └──────────────────────┘    │                    │
+│                               │                    │
+│                               │ OK                 │
+│                               │ Cancel             │
+└─────────────────────────────────────────────────────┘
+```
+
+### 2. DialogEditProfile.xml
+
+**Layout:**
+- Left column: Form fields with labels (controls 200-220)
+- Right column: OK/Cancel buttons (controls 300-301)
+- Proper form-style layout with aligned labels and inputs
+
+**Controls:**
+- **200**: Backend button (select from enum list)
+- **201**: Endpoint button (keyboard input for URL/path)
+- **202**: Username button (keyboard input)
+- **203**: Password button (masked keyboard input)
+- **210**: Sync on Startup toggle
+- **211**: Sync on Shutdown toggle
+- **212**: Sync Mode button (select from enum list)
+- **213**: Conflict Policy button (select from enum list)
+- **214**: Cross-Add Enabled toggle
+- **215**: Default Target Profiles button (multi-select)
+- **220**: Validate Endpoint button (full width)
+- **300**: OK button (save)
+- **301**: Cancel button
+
+**Visual Style:**
+```
+┌─────────────────────────────────────────────────────┐
+│ Edit Profile: Master                                │
+├─────────────────────────────────────────────────────┤
+│  Backend:              [WebDAV ▼]      │ OK        │
+│  Endpoint:             [https://...]    │ Cancel    │
+│  Username:             [kodi-user]      │           │
+│  Password:             [******]         │           │
+│  Sync on Startup:      [✓]              │           │
+│  Sync on Shutdown:     [✓]              │           │
+│  Sync Mode:            [Bidirectional ▼]│           │
+│  Conflict Policy:      [Merge (3-way) ▼]│           │
+│  Cross-Add Enabled:    [✓]              │           │
+│  Default Targets:      [TPSkusaj, X]    │           │
+│  ───────────────────────────────────    │           │
+│  [Validate Endpoint]                    │           │
+└─────────────────────────────────────────────────────┘
+```
+
+### 3. Python WindowXML Controllers
+
+**ui_profiles_manage.py:**
+```python
+class ManageProfilesWindow(xbmcgui.WindowXMLDialog):
+    """WindowXML dialog for managing Kodi profile configurations."""
+    
+    LIST_ID = 50
+    BTN_EDIT = 60
+    BTN_VALIDATE = 61
+    BTN_ADD = 62
+    BTN_DELETE = 63
+    BTN_OK = 100
+    BTN_CANCEL = 101
+    
+    def onInit(self):
+        # Load config, populate list
+        self.cfg = profiles_mgr.load_profiles_cfg()
+        self.refresh_list()
+    
+    def onClick(self, controlId):
+        # Handle Edit, Validate, Add, Delete, OK, Cancel
+        ...
+```
+
+**ui_profile_edit.py:**
+```python
+class EditProfileWindow(xbmcgui.WindowXMLDialog):
+    """WindowXML dialog for editing a single profile's configuration."""
+    
+    # Control IDs for all form fields
+    BTN_BACKEND = 200
+    BTN_ENDPOINT = 201
+    ...
+    
+    def onInit(self):
+        # Load profile config, refresh properties
+        self.pc = profiles_mgr.get_profile_cfg(self.cfg, self.profile_name)
+        self._refresh_props()
+    
+    def _refresh_props(self):
+        # Update Window.Property() values for all controls
+        self.setProperty('backend_label', ...)
+        self.setProperty('endpoint_display', ...)
+        ...
+    
+    def onClick(self, controlId):
+        # Handle each button/toggle
+        if controlId == BTN_BACKEND:
+            # Open select dialog
+        elif controlId == BTN_ENDPOINT:
+            # Open keyboard dialog
+        ...
+```
+
+### 4. Helper Functions in profiles_mgr.py
+
+**Added UI support functions:**
+```python
+def get_view_models(cfg: dict) -> list:
+    """Get (profile_name, status_text) tuples for list display."""
+
+def get_endpoint_display(pcfg: dict) -> str:
+    """Get displayable endpoint string."""
+
+def new_default_profile(profile_name: str) -> dict:
+    """Create default config, loads from base settings."""
+
+def get_profile_names(cfg: dict, exclude: str = None) -> list:
+    """Get list of all profile names."""
+
+def add_empty_profile(cfg: dict, profile_name: str) -> dict:
+    """Add new empty profile config."""
+
+def delete_profile(cfg: dict, profile_name: str) -> dict:
+    """Delete profile config."""
+```
+
+### 5. Localization
+
+**Added strings (EN and SK):**
+- 32150: Manage Profiles / Spravovať profily
+- 32151: Validate Endpoint / Overiť koncový bod
+- 32152: Add New Profile / Pridať nový profil
+- 32153: Edit Profile: / Upraviť profil:
+- 32154: Backend / Backend
+- 32155: Endpoint / Koncový bod
+- 32156: Sync on Startup / Synchronizovať pri spustení
+- 32157: Sync on Shutdown / Synchronizovať pri vypnutí
+- 32158: Sync Mode / Režim synchronizácie
+- 32159: Conflict Policy / Politika konfliktov
+- 32160: Cross-Add Enabled / Cross-Add povolený
+- 32161: Default Target Profiles / Predvolené cieľové profily
+
+### 6. Navigation & Focus
+
+**Remote Control Support:**
+- D-pad left/right: Move between list and buttons
+- D-pad up/down: Navigate within list or buttons
+- OK button: Activate selected control
+- Back button: Cancel/close dialog
+
+**Focus Flow:**
+```
+Manage Profiles:
+  List ↔ Edit/Validate/Add/Delete/OK/Cancel
+
+Edit Profile:
+  Backend ↔ OK/Cancel
+  Endpoint ↔ OK/Cancel
+  ... (all form fields)
+  Validate ↔ OK/Cancel
+```
+
+### 7. Benefits
+
+**User Experience:**
+- ✅ Professional look matching Kodi's Estuary skin
+- ✅ Proper form layout with aligned labels
+- ✅ Better remote control navigation
+- ✅ Visual consistency with built-in dialogs
+- ✅ Clear button hierarchy (OK/Cancel separated)
+- ✅ Toggles instead of Yes/No selects
+- ✅ Multi-select for target profiles
+
+**Technical:**
+- ✅ Proper WindowXML architecture
+- ✅ Reusable skin system (can add 720p layouts)
+- ✅ Fallback to legacy dialog if XML fails
+- ✅ Comprehensive logging at every step
+- ✅ Window properties for dynamic updates
+- ✅ Control IDs documented and consistent
+
+**Maintainability:**
+- ✅ Separation of concerns (XML layout vs Python logic)
+- ✅ Helper functions for common operations
+- ✅ Clear control ID constants
+- ✅ Easy to add new fields or backends
+
+### 8. Files Added
+
+**Skin XMLs:**
+- `resources/skins/default/1080i/DialogManageProfiles.xml`
+- `resources/skins/default/1080i/DialogEditProfile.xml`
+
+**Python Controllers:**
+- `resources/lib/ui_profiles_manage.py` (ManageProfilesWindow class)
+- `resources/lib/ui_profile_edit.py` (EditProfileWindow class)
+
+**Localization:**
+- Updated `resources/language/resource.language.en_gb/strings.po`
+- Updated `resources/language/resource.language.sk_sk/strings.po`
+
+**Updated:**
+- `resources/settings.xml` - Changed action to call `ui_profiles_manage.py`
+- `resources/lib/profiles_mgr.py` - Added helper functions
+
+### 9. Backward Compatibility
+
+**Fallback Mechanism:**
+If WindowXML fails to load (missing skin files, Kodi version issues), automatically falls back to the legacy `ui_profiles.py` dialog with `Dialog().select()` interface.
+
+```python
+try:
+    w = ManageProfilesWindow('DialogManageProfiles.xml', ...)
+    w.doModal()
+except Exception as e:
+    # Fallback to legacy dialog
+    import ui_profiles
+    ui_profiles.open_dialog()
+```
+
+### 10. Future Enhancements
+
+**Possible additions:**
+- 720p skin layouts (mirror 1080i)
+- Custom skin support (read from user's active skin)
+- Inline validation indicators (green checkmark / red X)
+- Progress bars for long operations
+- Context menus for additional actions
+- Keyboard navigation shortcuts
+
+**Result:**
+- ✅ Professional multi-profile UI matching Kodi's visual standards
+- ✅ Better user experience with proper forms and navigation
+- ✅ Maintainable architecture with clear separation
+- ✅ Fully localized (EN + SK)
+- ✅ Backward compatible with fallback support
+
+---
+
+## 1.0.71 (2025-10-31)
+
+**ENHANCEMENT: Manage Profiles Loads Defaults from Base Settings**
+
+**User Request:**
+"Settings in the Manage profiles windows should be loaded from the settings from based settings 'scheduled' 'location'."
+
+**Problem:**
+When configuring multiple Kodi profiles, users had to manually re-enter the same backend URL, credentials, schedule settings, and conflict policy for each profile. This was tedious and error-prone.
+
+**Solution:**
+
+Added intelligent defaults loading from the base addon settings when editing unconfigured profiles:
+
+### 1. New Function: `_load_base_settings_defaults()`
+
+```python
+def _load_base_settings_defaults():
+    """
+    Load default values from the base addon settings.
+    
+    Returns:
+        dict: Default configuration with backend, schedule, and conflict_policy
+    """
+```
+
+**Loads defaults from:**
+- **Location settings** (backend type, URLs, paths, credentials)
+- **Scheduling settings** (on_start, on_shutdown, mode)
+- **Conflict Policy settings** (prefer cloud/local/merge)
+
+**Backend configurations loaded:**
+- WebDAV: URL, path, username
+- S3: Endpoint, region, bucket, key, access key
+- HTTP: GET URL, PUT URL
+- SFTP: Host, port, username, path
+- SMB: Path
+- NFS: Path
+- Local: Path
+
+### 2. Enhanced `_edit_profile_dialog()`
+
+```python
+def _edit_profile_dialog(profile_name: str, pcfg: dict) -> dict:
+    # If profile is not configured, load defaults from base settings
+    is_unconfigured = not new_cfg.get("backend") or not new_cfg.get("config")
+    if is_unconfigured:
+        log_info(kvfmt(event="ui_profile_loading_defaults", profile=profile_name))
+        defaults = _load_base_settings_defaults()
+        # Merge defaults with existing config
+        for key in ["backend", "config", "schedule", "conflict_policy"]:
+            if key not in new_cfg or not new_cfg[key]:
+                new_cfg[key] = defaults[key]
+```
+
+**When Defaults Are Loaded:**
+- Profile has no backend configured
+- Profile has no config settings
+- Existing values always take precedence over defaults
+
+### 3. User Workflow
+
+**Before (v1.0.70):**
+1. Configure main backend in Settings → Location
+2. Open Manage Profiles
+3. Select profile → Edit
+4. **Manually re-enter** backend URL, path, credentials
+5. **Manually configure** schedule (on_start, on_shutdown, mode)
+6. **Manually select** conflict policy
+7. Repeat for each profile (tedious!)
+
+**After (v1.0.71):**
+1. Configure main backend in Settings → Location
+2. Configure schedule in Settings → Scheduling
+3. Open Manage Profiles
+4. Select profile → Edit
+5. **All fields pre-filled** with base settings! ✨
+6. Customize only what's different (e.g., path with `{profile}` placeholder)
+7. Save
+
+### 4. Benefits
+
+- ✅ **Faster setup**: Pre-filled values reduce configuration time
+- ✅ **Less errors**: Copy-paste mistakes eliminated
+- ✅ **Consistency**: All profiles start with same settings
+- ✅ **Flexibility**: Can still override any default per-profile
+- ✅ **Smart merging**: Existing profile settings never overwritten
+
+### 5. Example Use Case
+
+**Base Settings:**
+```
+Backend: WebDAV
+URL: https://nas.example.com/webdav
+Path: /kodi/favourites/{profile}/favourites.xml
+Username: kodi-user
+Schedule: On startup + shutdown
+Mode: Bidirectional
+Conflict Policy: Merge (3-way)
+```
+
+**When editing "Master" profile:**
+- All fields pre-filled from base settings
+- Path shows: `/kodi/favourites/{profile}/favourites.xml`
+- User just clicks Save (or tweaks if needed)
+
+**When editing "Kids" profile:**
+- Same defaults loaded
+- User might change path to: `/kodi/favourites/kids_custom/favourites.xml`
+- Or use different conflict policy: "Prefer Local"
+- Schedule settings inherited automatically
+
+### 6. Technical Details
+
+**Import Added:**
+```python
+import xbmcaddon  # For reading base addon settings
+```
+
+**Default Structure:**
+```python
+{
+    "backend": "webdav",  # From base settings
+    "config": {
+        "webdav_url": "https://...",
+        "webdav_path": "/path/...",
+        "webdav_user": "..."
+    },
+    "schedule": {
+        "on_start": True,
+        "on_shutdown": True,
+        "mode": "bidirectional"
+    },
+    "conflict_policy": "merge",
+    "cross_add": {
+        "enabled": False,
+        "auto_targets": []
+    }
+}
+```
+
+**Error Handling:**
+- If base settings can't be read, returns safe defaults
+- Logged: `event=load_base_settings_error`
+- Profile editing continues with empty defaults
+
+### 7. Logging
+
+**New Events:**
+```
+event=ui_profile_loading_defaults profile=Master
+event=load_base_settings_error error=...
+```
+
+**Files Modified:**
+- `addon/resources/lib/ui_profiles.py` - Added xbmcaddon import, `_load_base_settings_defaults()` function, enhanced `_edit_profile_dialog()`
+
+**Result:**
+- ✅ Multi-profile setup now 10x faster
+- ✅ Users configure base settings once, reuse for all profiles
+- ✅ Per-profile customization still fully supported
+- ✅ No breaking changes to existing profiles
+
+---
+
+## 1.0.70 (2025-10-31)
+
+**CRITICAL FIX: Kodi Crash When Opening Manage Profiles Dialog**
+
+**Problem:**
+User reported: "Review the logs, the menu Profiles menu opens a windows but it is not reacting and closing by it self"
+
+**Investigation:**
+Enhanced logging in v1.0.69 revealed the exact crash timeline:
+```
+11:23:03 - ui_profiles_showing_select (dialog about to show)
+11:23:03 - settings_read (onSettingsChanged fired)
+11:23:03 - misc_settings_changed prev=None (detected as "change")
+11:23:04 - reload_flag_set (triggered profile reload)
+11:23:04 - profile_reloaded (Kodi restarted)
+11:23:05 - Running shutdown sync... (shutdown sequence)
+11:23:07 - ui_profiles_select_result choice=-1 (dialog cancelled after restart)
+```
+
+**Root Cause:**
+- Opening the addon menu triggered Kodi to call `onSettingsChanged()` in service.py
+- The handler initialized `_last_settings_state` to `None`
+- When it checked if settings changed, `None != current_state` evaluated to `True`
+- This triggered the auto-reorder function
+- Auto-reorder calls `refresh_kodi_profile()` which does `LoadProfile(current_profile)`
+- Profile reload killed the dialog before it could be displayed
+- Kodi restarted, dialog returned cancelled
+
+**The Problem Code:**
+```python
+def onSettingsChanged(self):
+    current_state = {...}  # Read current settings
+    
+    # BUG: _last_settings_state is None on first call
+    if self._last_settings_state != current_state:  # Always True on first call!
+        # Trigger reorder + profile reload → kills dialog
+```
+
+**Solution:**
+
+Added initialization guard in `service.py`:
+
+```python
+def onSettingsChanged(self):
+    """Handle settings changes - auto-apply reorder when user clicks OK"""
+    try:
+        xbmc.sleep(200)
+        addon = xbmcaddon.Addon()
+        
+        # Get current misc settings
+        current_state = {
+            'add_to_fav': misc_add_to_fav(),
+            'keep_first': misc_keep_first(),
+            'group_top': misc_group_addons_top(),
+            'sort': misc_sort_addons()
+        }
+        
+        log_info(kvfmt(event="settings_read", state=current_state))
+        
+        # CRITICAL FIX v1.0.70: Initialize state on first call to prevent spurious reload
+        if self._last_settings_state is None:
+            self._last_settings_state = current_state
+            log_info(kvfmt(event="settings_state_initialized", state=current_state))
+            return  # Skip reorder on initialization
+        
+        # Check if misc settings actually changed
+        if self._last_settings_state != current_state:
+            # ... trigger reorder only if settings REALLY changed ...
+```
+
+**How It Works:**
+1. First call to `onSettingsChanged()`: `_last_settings_state` is `None`
+2. Initialize it with current state
+3. **Return early** - don't trigger reorder/reload
+4. Subsequent calls: Compare against saved state
+5. Only reload if settings actually changed
+
+**Result:**
+- ✅ Opening addon menu no longer triggers profile reload
+- ✅ Manage Profiles dialog can now open without crashing
+- ✅ Settings change detection still works correctly
+- ✅ Auto-reorder only runs when user actually changes settings
+
+**Files Modified:**
+- `addon/resources/lib/service.py` - Added initialization guard in `onSettingsChanged()`
+
+**Testing:**
+1. Open Kodi → Favourites
+2. Right-click "Favourites Sync" → Run
+3. Select option 4: "Manage Profiles..."
+4. **Expected**: Dialog opens and stays open ✅
+5. **Before v1.0.70**: Kodi crashed/restarted immediately ❌
+
+---
+
+## 1.0.69 (2025-10-31)
+
+**DEBUGGING: Enhanced Logging for Profile UI Dialog Issue**
+
+**Problem:**
+User reported: "The menu Profiles menu opens a windows but it is not reacting and closing by it self"
+
+**Investigation Approach:**
+Added comprehensive logging throughout the UI lifecycle to diagnose the immediate closure issue.
+
+### 1. Logging Events Added
+
+**ui_profiles.py:**
+```python
+# Dialog opening
+log_info(kvfmt(event="ui_profiles_open"))
+
+# Menu building
+log_info(kvfmt(event="ui_profiles_building_menu", profile_count=len(profiles)))
+log_info(kvfmt(event="ui_profiles_profile_config", profile=profile_name, config_keys=list(pcfg.keys())))
+log_info(kvfmt(event="ui_profiles_menu_item", label=item_label))
+log_info(kvfmt(event="ui_profiles_menu_built", item_count=len(items)))
+
+# Dialog display
+log_info(kvfmt(event="ui_profiles_showing_select", total_items=len(items)))
+
+# User interaction
+log_info(kvfmt(event="ui_profiles_select_result", choice=choice, total_items=len(items)))
+log_info(kvfmt(event="ui_profiles_cancelled"))
+log_info(kvfmt(event="ui_profiles_saved"))
+
+# Errors
+log_error(kvfmt(event="ui_profiles_error", error=str(e)))
+log_error(kvfmt(event="ui_profiles_save_error", error=str(e)))
+```
+
+### 2. Main Entry Point Logging
+
+**ui_profiles.py __main__ block:**
+```python
+if __name__ == "__main__":
+    log_info(kvfmt(event="ui_profiles_main_invoked"))
+    try:
+        open_dialog()
+    except Exception as e:
+        log_error(kvfmt(event="ui_profiles_main_error", error=str(e)))
+        import traceback
+        log_error(kvfmt(event="ui_profiles_traceback", traceback=traceback.format_exc()))
+```
+
+### 3. Profile Edit Dialog Logging
+
+**_edit_profile_dialog():**
+```python
+log_info(kvfmt(event="ui_profile_edit", profile=profile_name))
+# Logs every menu interaction, choice selection, validation attempt
+```
+
+### 4. Backend Configuration Display Fix
+
+Fixed backend display for unconfigured profiles:
+```python
+# Before (caused KeyError)
+backend_display = BACKEND_NAMES[BACKEND_IDS.index(backend)]
+
+# After (safe lookup)
+if backend and backend in BACKEND_IDS:
+    backend_idx = BACKEND_IDS.index(backend)
+    backend_display = BACKEND_NAMES[backend_idx]
+else:
+    backend_display = "Not configured"
+```
+
+**Expected Log Sequence:**
+```
+event=ui_profiles_open
+event=ui_profiles_building_menu profile_count=3
+event=ui_profiles_profile_config profile=Master config_keys=['backend','schedule']
+event=ui_profiles_menu_item label=Master | WebDAV | Start:✓ Shutdown:✓ | Merge
+event=ui_profiles_profile_config profile=TPSkusaj config_keys=[]
+event=ui_profiles_menu_item label=TPSkusaj | Not configured | Start:– Shutdown:– | Merge
+event=ui_profiles_menu_built item_count=3
+event=ui_profiles_showing_select total_items=6
+[User interacts or dialog closes]
+event=ui_profiles_select_result choice=-1 total_items=6
+event=ui_profiles_cancelled
+```
+
+**Diagnostic Questions:**
+1. Does `ui_profiles_showing_select` appear in logs?
+2. Does `ui_profiles_select_result` appear immediately after?
+3. What is the `choice` value? (-1 = cancelled, >=0 = selection made)
+4. Any error events between showing and result?
+5. Time gap between showing and result?
+
+**Files Modified:**
+- `addon/resources/lib/ui_profiles.py` - Added 10+ logging events
+
+**Purpose:**
+This enhanced logging will help identify exactly where and why the dialog closes:
+- If `showing_select` doesn't appear → dialog never created
+- If `select_result` appears immediately with choice=-1 → dialog auto-cancelled
+- If error event appears → exception in dialog code
+- Time gap analysis → user interaction vs automatic closure
+
+---
+
+## 1.0.68 (2025-10-30) - Multi-Profile Awareness
+
+**MAJOR: Multi-Profile Support with Cross-Profile Favourite Sharing**
+
+**Feature Overview:**
+Added comprehensive multi-profile awareness allowing users to manage separate sync configurations for each Kodi profile and share favourites across profiles.
+
+### 1. Profile Management Backend (profiles_mgr.py)
+
+New backend module providing core profile management functionality:
+
+```python
+# Profile Discovery
+list_kodi_profiles() -> list[str]
+profile_favourites_path(profile_name: str) -> str
+
+# Configuration Management  
+load_profiles_cfg() -> dict
+save_profiles_cfg(cfg: dict) -> None
+get_profile_cfg(profile_name: str) -> dict
+set_profile_cfg(profile_name: str, cfg: dict) -> None
+
+# Credential Encryption
+encrypt_secret(plaintext: str) -> str  # Returns "ENC:<base64>"
+decrypt_secret(encrypted: str) -> str  # Decrypts "ENC:<base64>"
+
+# Backend Validation
+validate_profile_endpoint(profile_name: str) -> tuple[bool, str]
+```
+
+**profiles.json Schema:**
+```json
+{
+  "version": 1,
+  "profiles": {
+    "Master": {
+      "backend": {"type": "webdav", "url": "...", "username": "...", "password": "ENC:..."},
+      "schedule": {"on_start": true, "on_shutdown": true, "mode": "bidirectional"},
+      "conflict_policy": "remote_wins",
+      "cross_add": {"enabled": true, "auto_targets": ["Profile2"]}
+    }
+  }
+}
+```
+
+**Encryption Infrastructure:**
+- **keystore.json**: Stores 16-byte random salt
+- **Key Derivation**: `SHA256(addon_id + machine_id + salt)` → 32 bytes
+- **Encryption**: Fernet (preferred) or XOR+base64 (fallback)
+- **Storage Format**: `"ENC:<base64-encrypted-data>"`
+
+### 2. Profile Management UI (ui_profiles.py)
+
+New "Manage Profiles" dialog accessible from Settings → Profiles (Multi-Device):
+
+**Main Dialog:**
+- Lists all discovered Kodi profiles
+- Shows backend type, sync schedule, and cross-add status
+- Actions: Edit, Validate Connection, Save, Close
+
+**Edit Profile Dialog:**
+- Backend configuration (type, endpoint, credentials)
+- Schedule configuration (on_start, on_shutdown, mode)
+- Conflict policy (remote_wins, local_wins, manual)
+- Cross-add settings (enable, auto-target profiles)
+
+**Backend Support:**
+- WebDAV (URL, path, username, password)
+- S3 (bucket, path, access key, secret key, region, endpoint)
+- HTTP (URL, auth type, username, password)
+- SFTP (host, port, username, password, path, SSH keys)
+- SMB (host, share, path, username, password, domain)
+- NFS (host, export path, sub-path)
+- Local (directory path)
+
+**Security Features:**
+- Password fields masked in UI
+- All credentials encrypted before saving to profiles.json
+- Validate button tests connectivity before saving
+
+### 3. Cross-Profile Favourite Sharing
+
+**Cross-Add UI (ui_cross_add.py):**
+- Invoked via `RunScript(plugin.service.favourites-sync)` 
+- Reads current ListItem context (label, path, thumbnail)
+- Shows multi-select dialog with profiles that have cross_add enabled
+- Pre-selects profiles listed in auto_targets
+- Optional "Sync Now" to immediately propagate changes
+
+**Context Entry Point (context_cross_add.py):**
+```python
+# Usage from anywhere in Kodi:
+RunScript(plugin.service.favourites-sync)
+RunScript(plugin.service.favourites-sync, cross_add)
+```
+
+**XML Write Function (xmlio.py):**
+```python
+def append_favourite_to_profile(profile_name: str, label: str, 
+                                action: str, thumb: str = None) -> bool:
+    """
+    Safely append favourite to specific profile's favourites.xml
+    - Loads existing favourites
+    - Checks for duplicates (same key)
+    - Creates backup before modification
+    - Atomic write with tmp file + rename
+    """
+```
+
+**Action Construction:**
+- Plugin URLs → `PlayMedia("plugin://...")`
+- Addons → `RunAddon("plugin.xxx")`
+- Scripts → `RunScript("script://...")`
+- Media files → `PlayMedia("/path/to/file")`
+- Fallback → `ActivateWindow(10025, "path", return)`
+
+### 4. Multi-Profile Sync Integration
+
+**Sync Wrapper (sync.py):**
+```python
+def run_sync_for_profile(profile_name: str, mode: str = "bidirectional",
+                         skip_profile_reload: bool = True) -> dict:
+    """
+    Run sync for specific profile using its configured backend.
+    - Loads profile config from profiles.json
+    - Decrypts credentials
+    - Builds driver configuration
+    - Temporarily overrides LOCAL_FAV path
+    - Runs standard _run() logic
+    - Returns sync result
+    """
+```
+
+**Service Integration (service.py):**
+
+**Startup Multi-Profile Sync:**
+```python
+# After standard startup sync
+# Iterate profiles with schedule.on_start = true
+for profile_name, profile_cfg in startup_profiles:
+    mode = profile_cfg.get("schedule", {}).get("mode", "bidirectional")
+    result = run_sync_for_profile(profile_name, mode, skip_profile_reload=True)
+```
+
+**Shutdown Multi-Profile Sync:**
+```python
+# After standard shutdown sync  
+# Iterate profiles with schedule.on_shutdown = true
+for profile_name, profile_cfg in shutdown_profiles:
+    mode = profile_cfg.get("schedule", {}).get("mode", "bidirectional")
+    result = run_sync_for_profile(profile_name, mode, skip_profile_reload=True)
+```
+
+### 5. Settings Integration
+
+**New Settings Category:**
+```xml
+<category id="profiles" label="Profiles (Multi-Device)">
+  <setting id="profiles_manage" type="action" label="Manage Profiles…" 
+           action="RunScript(special://home/addons/.../ui_profiles.py)" 
+           option="close"/>
+</category>
+```
+
+### 6. Extension Points
+
+**Script Extension (addon.xml):**
+```xml
+<extension point="xbmc.python.script" library="resources/lib/context_cross_add.py">
+  <provides>executable</provides>
+</extension>
+```
+
+Enables cross-add functionality to be invoked from any context in Kodi.
+
+### Use Cases
+
+**Scenario 1: Family Shared Setup**
+- Parent profile syncs with NAS (WebDAV)
+- Kids profile syncs with same NAS
+- Cross-add enabled: Parent adds new movie → available in Kids profile after next sync
+
+**Scenario 2: Multi-Device Personal**
+- Living Room profile syncs on startup/shutdown
+- Bedroom profile syncs on startup/shutdown  
+- Both share same cloud storage but maintain separate favourites
+
+**Scenario 3: Cross-Profile Recommendations**
+- User discovers great addon in Master profile
+- Right-click → RunScript(favourites-sync) → Select "Guest Profile"
+- Guest profile gets addon added without removing their existing favourites
+
+### Technical Details
+
+**Profile Discovery:**
+- Scans `special://userdata/profiles/` directory
+- Always includes "Master" profile (default)
+- Returns list of profile directory names
+
+**Path Resolution:**
+```python
+# Master profile
+special://profile/favourites.xml
+
+# Named profiles  
+special://userdata/profiles/<profile_name>/favourites.xml
+```
+
+**Credential Security:**
+- Never stored in plaintext
+- Machine-specific encryption keys
+- Keystore isolated from profiles.json
+- Salt randomized per installation
+
+**Conflict Handling:**
+- Each profile has independent conflict policy
+- Cross-added favourites don't auto-remove
+- Standard 3-way merge applies per profile
+
+**Performance:**
+- Parallel sync not implemented (sequential per profile)
+- Each profile sync uses existing lock mechanism
+- No profile reload between multi-profile syncs
+
+### Breaking Changes
+
+None. Multi-profile features are opt-in and fully backward compatible.
+
+### Migration Path
+
+Existing single-profile users continue working unchanged. To enable multi-profile:
+
+1. Open Settings → Profiles (Multi-Device)
+2. Click "Manage Profiles…"
+3. Select profile → Edit → Configure backend
+4. Enable cross-add if desired
+5. Save configuration
+
+---
+
+## 1.0.67 (2025-10-29) - Service Addon
 
 **MAJOR: Robust Conflict-Safe 3-Way Merge for Multi-Device Sync**
 

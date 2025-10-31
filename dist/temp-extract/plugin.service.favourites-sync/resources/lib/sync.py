@@ -420,46 +420,9 @@ def _run(mode: str, dry_run: bool = False, skip_profile_reload: bool = False) ->
     try:
         cfg = _settings_dict()
         backend = _backend_from_settings(cfg)
-        
-        # CRITICAL: Try to access cloud BEFORE reading/modifying local file
-        # If cloud is unavailable, preserve local favourites.xml and abort
-        try:
-            remote_meta = backend.stat()
-            remote_bytes = backend.download()
-        except Exception as e:
-            # Cloud unavailable - preserve local file and abort sync
-            # Extract user-friendly error message
-            error_str = str(e)
-            backend_type = cfg.get("backend", "cloud")
-            
-            # Simplify common error messages
-            if "network path was not found" in error_str.lower() or "cannot access path" in error_str.lower():
-                user_msg = f"Network path not accessible ({backend_type})"
-            elif "connection" in error_str.lower() and "refused" in error_str.lower():
-                user_msg = f"Connection refused ({backend_type})"
-            elif "timeout" in error_str.lower():
-                user_msg = f"Connection timeout ({backend_type})"
-            elif "401" in error_str or "unauthorized" in error_str.lower():
-                user_msg = f"Authentication failed ({backend_type})"
-            elif "403" in error_str or "forbidden" in error_str.lower():
-                user_msg = f"Access denied ({backend_type})"
-            elif "404" in error_str or "not found" in error_str.lower():
-                user_msg = f"File or path not found ({backend_type})"
-            elif "50" in error_str[:3]:  # 500, 502, 503, 504
-                user_msg = f"Server error ({backend_type})"
-            else:
-                # Generic message for other errors
-                user_msg = f"Cannot reach {backend_type} storage"
-            
-            log_error(kvfmt(event="cloud_unavailable", error=str(e), mode=mode, backend=backend_type))
-            status["error"] = user_msg
-            status["error_detail"] = str(e)  # Keep full error for logs
-            status["result"] = "cloud_unavailable"
-            _save_status(status)
-            _release_lock()
-            return status
-        
-        # Cloud is accessible - safe to proceed with sync
+        # Inputs
+        remote_meta = backend.stat()
+        remote_bytes = backend.download()
         local_bytes = _xbmcvfs_read(LOCAL_FAV)
         local_list = xmlio.load_xml(local_bytes)
         remote_list = xmlio.load_xml(remote_bytes)
@@ -627,47 +590,8 @@ def _run(mode: str, dry_run: bool = False, skip_profile_reload: bool = False) ->
                                {"etag": remote_meta.get("etag", "")})
                 changed += 1
             except Exception as e:
-                # Upload failed - cloud unavailable
-                # Extract user-friendly error message (same logic as download)
-                error_str = str(e)
-                backend_type = cfg.get("backend", "cloud")
-                
-                # Simplify common error messages
-                if "network path was not found" in error_str.lower() or "cannot write to" in error_str.lower():
-                    user_msg = f"Network path not accessible ({backend_type})"
-                elif "connection" in error_str.lower() and "refused" in error_str.lower():
-                    user_msg = f"Connection refused ({backend_type})"
-                elif "timeout" in error_str.lower():
-                    user_msg = f"Connection timeout ({backend_type})"
-                elif "401" in error_str or "unauthorized" in error_str.lower():
-                    user_msg = f"Authentication failed ({backend_type})"
-                elif "403" in error_str or "forbidden" in error_str.lower():
-                    user_msg = f"Access denied ({backend_type})"
-                elif "404" in error_str or "not found" in error_str.lower():
-                    user_msg = f"File or path not found ({backend_type})"
-                elif "50" in error_str[:3]:  # 500, 502, 503, 504
-                    user_msg = f"Server error ({backend_type})"
-                else:
-                    # Generic message for other errors
-                    user_msg = f"Cannot reach {backend_type} storage"
-                
                 log_error(kvfmt(event="upload_error", error=str(e)))
-                
-                # For bidirectional mode, local changes are saved even if upload fails
-                # This is acceptable - local favourites are safe
-                if mode == "bidirectional":
-                    status["error"] = user_msg + " (local changes saved, upload failed)"
-                    status["error_detail"] = str(e)
-                    status["result"] = "partial_success"  # Local OK, cloud upload failed
-                    log_error(kvfmt(event="upload_failed_but_local_saved", mode=mode, error=user_msg))
-                else:
-                    # Push mode - upload is critical, must fail
-                    status["error"] = user_msg
-                    status["error_detail"] = str(e)
-                    status["result"] = "cloud_unavailable"
-                    _save_status(status)
-                    _release_lock()
-                    return status
+                raise
 
         # Calculate hashes for 3-way merge tracking
         final_local_bytes = _xbmcvfs_read(LOCAL_FAV)
@@ -797,16 +721,6 @@ def run_sync_ui(mode):
                 msg += f"  ... and {len(res.get('removed_items', [])) - 5} more\n"
         msg += f"\nTotal changes: {res.get('changed_items', 0)}"
         d.ok(ADDON.getAddonInfo("name"), msg)
-    elif res.get("result") == "partial_success":
-        # Local changes saved but cloud upload failed
-        error_msg = res.get('error', 'Upload failed')
-        d.ok("Favourites Sync - Partial Success", 
-             f"Your local favourites were updated successfully.\n\n{error_msg}\n\nYour changes will sync to cloud when the storage is accessible.")
-    elif res.get("result") == "cloud_unavailable":
-        # Cloud is down - local favourites preserved
-        error_msg = res.get('error', 'Cloud unavailable')
-        d.ok("Favourites Sync - Cloud Unavailable", 
-             f"Your local favourites are safe and unchanged.\n\n{error_msg}\n\nSync will work again when the storage is accessible.")
     else:
         d.ok("Favourites Sync", f"Failed: {res.get('error')}")
 

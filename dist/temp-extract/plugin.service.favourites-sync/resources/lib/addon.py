@@ -50,7 +50,6 @@ def main():
         "Push (Local → Cloud)",
         "Bidirectional",
         "Dry-run (Preview)",
-        "Manage Profiles…",
         "Restore from Backup…",
         "Last Sync Status",
         "Refresh Profile",
@@ -87,20 +86,6 @@ def main():
     elif choice == 3:
         run_sync_ui("dryrun")
     elif choice == 4:
-        # Manage Profiles
-        log_info("addon.py main() - opening Manage Profiles dialog")
-        try:
-            from . import ui_profiles_manage
-        except ImportError:
-            import ui_profiles_manage
-        try:
-            ui_profiles_manage.open_manage_dialog()
-        except Exception as e:
-            log_info(f"addon.py main() - error opening profiles UI: {e}")
-            import traceback
-            log_info(f"addon.py main() - traceback: {traceback.format_exc()}")
-            dialog.ok("Manage Profiles", f"Error opening profiles dialog:\n{str(e)}")
-    elif choice == 5:
         # restore from backup
         try:
             from .sync import ADDON_DATA, _xbmcvfs_write_atomic
@@ -141,7 +126,7 @@ def main():
             pass
         
         dialog.notification("Restore", "Favourites restored - profile reloaded", xbmcgui.NOTIFICATION_INFO, 3000)
-    elif choice == 6:
+    elif choice == 5:
         try:
             from .sync import _load_status
         except ImportError:
@@ -149,7 +134,7 @@ def main():
         st = _load_status()
         msg = f"Last: {st.get('last_run','-')}\nResult: {st.get('result','-')}\nChanged: {st.get('changed_items',0)}"
         dialog.ok("Last Sync Status", msg)
-    elif choice == 7:
+    elif choice == 6:
         # Refresh Profile
         try:
             from .reorder import refresh_kodi_profile
@@ -165,7 +150,7 @@ def main():
         else:
             dialog.notification("Refresh Profile", "Failed to reload profile", xbmcgui.NOTIFICATION_ERROR, 3000)
             log_info("Profile refresh failed")
-    elif choice == 8:
+    elif choice == 7:
         open_settings()
         log_info("settings_opened")
 

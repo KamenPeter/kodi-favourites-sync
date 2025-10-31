@@ -1,0 +1,370 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<window>
+    <defaultcontrol always="true">200</defaultcontrol>
+    <allowoverlay>no</allowoverlay>
+
+    <coordinates>
+        <system>1</system>
+        <posx>0</posx>
+        <posy>0</posy>
+    </coordinates>
+
+    <controls>
+        <!-- Dim background -->
+        <control type="image">
+            <left>0</left>
+            <top>0</top>
+            <width>1920</width>
+            <height>1080</height>
+            <texture colordiffuse="CC000000">colors/black.png</texture>
+        </control>
+
+        <!-- Dialog panel -->
+        <control type="group">
+            <left>260</left>
+            <top>100</top>
+            <width>1400</width>
+            <height>880</height>
+
+            <!-- Background -->
+            <control type="image">
+                <left>0</left>
+                <top>0</top>
+                <width>1400</width>
+                <height>880</height>
+                <texture border="20">dialogs/dialog-bg.png</texture>
+            </control>
+
+            <!-- Header -->
+            <control type="label" id="11">
+                <left>30</left>
+                <top>20</top>
+                <width>1340</width>
+                <height>40</height>
+                <font>font13_title</font>
+                <textcolor>selected</textcolor>
+                <label>32153 $INFO[Window.Property(profile_name)]</label> <!-- Edit Profile: {name} -->
+            </control>
+
+            <!-- Separator line -->
+            <control type="image">
+                <left>30</left>
+                <top>70</top>
+                <width>1340</width>
+                <height>2</height>
+                <texture>dialogs/separator.png</texture>
+            </control>
+
+            <!-- Left column: form -->
+            <control type="group">
+                <left>30</left>
+                <top>90</top>
+                <width>950</width>
+                <height>710</height>
+
+                <!-- Backend label -->
+                <control type="label">
+                    <left>0</left>
+                    <top>10</top>
+                    <width>350</width>
+                    <height>40</height>
+                    <font>font13</font>
+                    <textcolor>grey2</textcolor>
+                    <label>32154</label> <!-- Backend -->
+                    <aligny>center</aligny>
+                </control>
+                <!-- Backend button -->
+                <control type="button" id="200">
+                    <left>370</left>
+                    <top>0</top>
+                    <width>560</width>
+                    <height>50</height>
+                    <font>font13</font>
+                    <label>$INFO[Window.Property(backend_label)]</label>
+                    <onup>220</onup>
+                    <ondown>201</ondown>
+                    <onleft>300</onleft>
+                    <onright>300</onright>
+                </control>
+
+                <!-- Endpoint label -->
+                <control type="label">
+                    <left>0</left>
+                    <top>70</top>
+                    <width>350</width>
+                    <height>40</height>
+                    <font>font13</font>
+                    <textcolor>grey2</textcolor>
+                    <label>32155</label> <!-- Endpoint -->
+                    <aligny>center</aligny>
+                </control>
+                <!-- Endpoint button -->
+                <control type="button" id="201">
+                    <left>370</left>
+                    <top>60</top>
+                    <width>560</width>
+                    <height>50</height>
+                    <font>font13</font>
+                    <label>$INFO[Window.Property(endpoint_display)]</label>
+                    <onup>200</onup>
+                    <ondown>202</ondown>
+                    <onleft>300</onleft>
+                    <onright>300</onright>
+                </control>
+
+                <!-- Username label -->
+                <control type="label">
+                    <left>0</left>
+                    <top>130</top>
+                    <width>350</width>
+                    <height>40</height>
+                    <font>font13</font>
+                    <textcolor>grey2</textcolor>
+                    <label>1048</label> <!-- Username -->
+                    <aligny>center</aligny>
+                </control>
+                <!-- Username button -->
+                <control type="button" id="202">
+                    <left>370</left>
+                    <top>120</top>
+                    <width>560</width>
+                    <height>50</height>
+                    <font>font13</font>
+                    <label>$INFO[Window.Property(username_display)]</label>
+                    <onup>201</onup>
+                    <ondown>203</ondown>
+                    <onleft>300</onleft>
+                    <onright>300</onright>
+                </control>
+
+                <!-- Password label -->
+                <control type="label">
+                    <left>0</left>
+                    <top>190</top>
+                    <width>350</width>
+                    <height>40</height>
+                    <font>font13</font>
+                    <textcolor>grey2</textcolor>
+                    <label>733</label> <!-- Password -->
+                    <aligny>center</aligny>
+                </control>
+                <!-- Password button -->
+                <control type="button" id="203">
+                    <left>370</left>
+                    <top>180</top>
+                    <width>560</width>
+                    <height>50</height>
+                    <font>font13</font>
+                    <label>******</label>
+                    <onup>202</onup>
+                    <ondown>210</ondown>
+                    <onleft>300</onleft>
+                    <onright>300</onright>
+                </control>
+
+                <!-- Sync on Startup label -->
+                <control type="label">
+                    <left>0</left>
+                    <top>250</top>
+                    <width>350</width>
+                    <height>40</height>
+                    <font>font13</font>
+                    <textcolor>grey2</textcolor>
+                    <label>32156</label> <!-- Sync on Startup -->
+                    <aligny>center</aligny>
+                </control>
+                <!-- Sync on Startup toggle -->
+                <control type="togglebutton" id="210">
+                    <left>370</left>
+                    <top>240</top>
+                    <width>120</width>
+                    <height>50</height>
+                    <font>font13</font>
+                    <label>424</label> <!-- Off -->
+                    <altlabel>209</altlabel> <!-- On -->
+                    <onup>203</onup>
+                    <ondown>211</ondown>
+                    <onleft>300</onleft>
+                    <onright>300</onright>
+                </control>
+
+                <!-- Sync on Shutdown label -->
+                <control type="label">
+                    <left>0</left>
+                    <top>310</top>
+                    <width>350</width>
+                    <height>40</height>
+                    <font>font13</font>
+                    <textcolor>grey2</textcolor>
+                    <label>32157</label> <!-- Sync on Shutdown -->
+                    <aligny>center</aligny>
+                </control>
+                <!-- Sync on Shutdown toggle -->
+                <control type="togglebutton" id="211">
+                    <left>370</left>
+                    <top>300</top>
+                    <width>120</width>
+                    <height>50</height>
+                    <font>font13</font>
+                    <label>424</label> <!-- Off -->
+                    <altlabel>209</altlabel> <!-- On -->
+                    <onup>210</onup>
+                    <ondown>212</ondown>
+                    <onleft>300</onleft>
+                    <onright>300</onright>
+                </control>
+
+                <!-- Sync Mode label -->
+                <control type="label">
+                    <left>0</left>
+                    <top>370</top>
+                    <width>350</width>
+                    <height>40</height>
+                    <font>font13</font>
+                    <textcolor>grey2</textcolor>
+                    <label>32158</label> <!-- Sync Mode -->
+                    <aligny>center</aligny>
+                </control>
+                <!-- Sync Mode button -->
+                <control type="button" id="212">
+                    <left>370</left>
+                    <top>360</top>
+                    <width>560</width>
+                    <height>50</height>
+                    <font>font13</font>
+                    <label>$INFO[Window.Property(sync_mode_label)]</label>
+                    <onup>211</onup>
+                    <ondown>213</ondown>
+                    <onleft>300</onleft>
+                    <onright>300</onright>
+                </control>
+
+                <!-- Conflict Policy label -->
+                <control type="label">
+                    <left>0</left>
+                    <top>430</top>
+                    <width>350</width>
+                    <height>40</height>
+                    <font>font13</font>
+                    <textcolor>grey2</textcolor>
+                    <label>32159</label> <!-- Conflict Policy -->
+                    <aligny>center</aligny>
+                </control>
+                <!-- Conflict Policy button -->
+                <control type="button" id="213">
+                    <left>370</left>
+                    <top>420</top>
+                    <width>560</width>
+                    <height>50</height>
+                    <font>font13</font>
+                    <label>$INFO[Window.Property(conflict_policy_label)]</label>
+                    <onup>212</onup>
+                    <ondown>214</ondown>
+                    <onleft>300</onleft>
+                    <onright>300</onright>
+                </control>
+
+                <!-- Cross-Add Enabled label -->
+                <control type="label">
+                    <left>0</left>
+                    <top>490</top>
+                    <width>350</width>
+                    <height>40</height>
+                    <font>font13</font>
+                    <textcolor>grey2</textcolor>
+                    <label>32160</label> <!-- Cross-Add Enabled -->
+                    <aligny>center</aligny>
+                </control>
+                <!-- Cross-Add Enabled toggle -->
+                <control type="togglebutton" id="214">
+                    <left>370</left>
+                    <top>480</top>
+                    <width>120</width>
+                    <height>50</height>
+                    <font>font13</font>
+                    <label>424</label> <!-- Off -->
+                    <altlabel>209</altlabel> <!-- On -->
+                    <onup>213</onup>
+                    <ondown>215</ondown>
+                    <onleft>300</onleft>
+                    <onright>300</onright>
+                </control>
+
+                <!-- Default Targets label -->
+                <control type="label">
+                    <left>0</left>
+                    <top>550</top>
+                    <width>350</width>
+                    <height>40</height>
+                    <font>font13</font>
+                    <textcolor>grey2</textcolor>
+                    <label>32161</label> <!-- Default Target Profiles -->
+                    <aligny>center</aligny>
+                </control>
+                <!-- Default Targets button -->
+                <control type="button" id="215">
+                    <left>370</left>
+                    <top>540</top>
+                    <width>560</width>
+                    <height>50</height>
+                    <font>font13</font>
+                    <label>$INFO[Window.Property(default_targets_label)]</label>
+                    <onup>214</onup>
+                    <ondown>220</ondown>
+                    <onleft>300</onleft>
+                    <onright>300</onright>
+                </control>
+
+                <!-- Validate button (full width) -->
+                <control type="button" id="220">
+                    <left>0</left>
+                    <top>620</top>
+                    <width>930</width>
+                    <height>50</height>
+                    <font>font13</font>
+                    <label>32151</label> <!-- Validate Endpoint -->
+                    <onup>215</onup>
+                    <ondown>200</ondown>
+                    <onleft>300</onleft>
+                    <onright>300</onright>
+                </control>
+            </control>
+
+            <!-- Right column: action buttons -->
+            <control type="group">
+                <left>1010</left>
+                <top>90</top>
+                <width>360</width>
+                <height>710</height>
+
+                <!-- OK button -->
+                <control type="button" id="300">
+                    <left>0</left>
+                    <top>590</top>
+                    <width>360</width>
+                    <height>50</height>
+                    <font>font13</font>
+                    <label>186</label> <!-- OK -->
+                    <onup>301</onup>
+                    <ondown>301</ondown>
+                    <onleft>200</onleft>
+                    <onright>200</onright>
+                </control>
+
+                <!-- Cancel button -->
+                <control type="button" id="301">
+                    <left>0</left>
+                    <top>650</top>
+                    <width>360</width>
+                    <height>50</height>
+                    <font>font13</font>
+                    <label>222</label> <!-- Cancel -->
+                    <onup>300</onup>
+                    <ondown>300</ondown>
+                    <onleft>200</onleft>
+                    <onright>200</onright>
+                </control>
+            </control>
+        </control>
+    </controls>
+</window>
