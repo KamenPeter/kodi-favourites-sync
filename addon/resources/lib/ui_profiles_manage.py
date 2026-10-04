@@ -36,6 +36,7 @@ class ManageProfilesWindow(xbmcgui.WindowXMLDialog):
     
     def onInit(self):
         """Initialize the dialog - load config and populate list."""
+        xbmc.log("[favourites-sync] DialogManageProfiles initialized", xbmc.LOGINFO)
         log_info(kvfmt(event="ui_profiles_manage_init"))
         
         try:
@@ -206,16 +207,27 @@ def open_manage_dialog():
     Open the Manage Profiles dialog.
     
     This is the main entry point called from settings or addon menu.
-    Falls back to legacy dialog if WindowXML fails to load.
+    Shows explicit error if WindowXML fails to load.
     """
     log_info(kvfmt(event="ui_profiles_manage_open"))
     
+    addon_path = None
     try:
-        addon = xbmcaddon.Addon()
+        # Try to get addon instance - pass ID explicitly for RunScript calls
+        try:
+            addon = xbmcaddon.Addon('plugin.service.favourites-sync')
+        except:
+            addon = xbmcaddon.Addon()
+        
         addon_path = addon.getAddonInfo('path')
         
+        # Log the XML path for troubleshooting
+        xml_file = 'DialogManageProfiles.xml'
+        xbmc.log(f"[favourites-sync] Opening WindowXMLDialog: {xml_file} from {addon_path}", xbmc.LOGINFO)
+        xbmc.log(f"[favourites-sync] Resolution folder: 1080i (will fallback to 720p if needed)", xbmc.LOGINFO)
+        
         w = ManageProfilesWindow(
-            'DialogManageProfiles.xml',
+            xml_file,
             addon_path,
             'default',
             '1080i'
@@ -228,14 +240,42 @@ def open_manage_dialog():
     except Exception as e:
         log_error(kvfmt(event="ui_profiles_manage_error", error=str(e)))
         
-        # Fallback to legacy dialog
-        log_info(kvfmt(event="ui_profiles_manage_fallback_legacy"))
-        try:
-            from . import ui_profiles
-            ui_profiles.open_dialog()
-        except ImportError:
-            import ui_profiles
-            ui_profiles.open_dialog()
+        # Build error message with safe addon_path handling
+        if addon_path:
+            path_info = f"Path: {addon_path}/resources/skins/default/"
+        else:
+            path_info = "Path: [Could not determine addon path]"
+        
+        error_msg = (
+            f"Failed to load WindowXML dialog:\n\n{str(e)}\n\n"
+            f"XML: DialogManageProfiles.xml\n"
+            f"{path_info}\n\n"
+            f"Expected locations:\n"
+            f"- 1080i/DialogManageProfiles.xml\n"
+            f"- 720p/DialogManageProfiles.xml"
+        )
+        xbmc.log(f"[favourites-sync] WindowXML ERROR: {error_msg}", xbmc.LOGERROR)
+        
+        # Show error dialog
+        xbmcgui.Dialog().ok(
+            "Favourites Sync - UI Error",
+            error_msg
+        )
+        
+        # Fallback to legacy dialog only if user confirms
+        if xbmcgui.Dialog().yesno(
+            "Favourites Sync",
+            "WindowXML dialog failed to load.\n\nUse legacy list dialog instead?",
+            nolabel="Cancel",
+            yeslabel="Use Legacy"
+        ):
+            log_info(kvfmt(event="ui_profiles_manage_fallback_legacy"))
+            try:
+                from . import ui_profiles
+                ui_profiles.open_dialog()
+            except ImportError:
+                import ui_profiles
+                ui_profiles.open_dialog()
 
 
 if __name__ == "__main__":

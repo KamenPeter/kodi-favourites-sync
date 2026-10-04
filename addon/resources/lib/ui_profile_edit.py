@@ -55,6 +55,7 @@ class EditProfileWindow(xbmcgui.WindowXMLDialog):
     
     def onInit(self):
         """Initialize the dialog - load profile config and populate fields."""
+        xbmc.log(f"[favourites-sync] DialogEditProfile initialized for profile: {self.profile_name}", xbmc.LOGINFO)
         log_info(kvfmt(event="ui_profile_edit_init", profile=self.profile_name))
         
         try:
@@ -414,12 +415,23 @@ def open_edit_dialog(profile_name, cfg):
     """
     log_info(kvfmt(event="ui_profile_edit_open", profile=profile_name))
     
+    addon_path = None
     try:
-        addon = xbmcaddon.Addon()
+        # Try to get addon instance - pass ID explicitly for RunScript calls
+        try:
+            addon = xbmcaddon.Addon('plugin.service.favourites-sync')
+        except:
+            addon = xbmcaddon.Addon()
+        
         addon_path = addon.getAddonInfo('path')
         
+        # Log the XML path for troubleshooting
+        xml_file = 'DialogEditProfile.xml'
+        xbmc.log(f"[favourites-sync] Opening WindowXMLDialog: {xml_file} for profile: {profile_name}", xbmc.LOGINFO)
+        xbmc.log(f"[favourites-sync] Path: {addon_path}, Resolution: 1080i", xbmc.LOGINFO)
+        
         w = EditProfileWindow(
-            'DialogEditProfile.xml',
+            xml_file,
             addon_path,
             'default',
             '1080i',
@@ -437,11 +449,27 @@ def open_edit_dialog(profile_name, cfg):
     
     except Exception as e:
         log_error(kvfmt(event="ui_profile_edit_error", error=str(e), profile=profile_name))
-        xbmcgui.Dialog().notification(
-            "Favourites Sync",
-            f"Failed to open editor: {str(e)}",
-            xbmcgui.NOTIFICATION_ERROR,
-            3000
+        
+        # Build error message with safe addon_path handling
+        if addon_path:
+            path_info = f"Path: {addon_path}"
+        else:
+            path_info = "Path: [Could not determine addon path]"
+        
+        error_msg = (
+            f"Failed to load Edit Profile dialog:\n\n{str(e)}\n\n"
+            f"Profile: {profile_name}\n"
+            f"XML: DialogEditProfile.xml\n"
+            f"{path_info}\n\n"
+            f"Check that XML exists in:\n"
+            f"- resources/skins/default/1080i/\n"
+            f"- resources/skins/default/720p/"
+        )
+        xbmc.log(f"[favourites-sync] WindowXML ERROR: {error_msg}", xbmc.LOGERROR)
+        
+        xbmcgui.Dialog().ok(
+            "Favourites Sync - UI Error",
+            error_msg
         )
         return cfg  # Return original on error
 

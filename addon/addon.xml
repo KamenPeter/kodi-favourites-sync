@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <addon id="plugin.service.favourites-sync"
        name="Favourites Sync (Cloud)"
-       version="1.0.73.1"
+       version="1.0.74.3"
        provider-name="Kamen">
   <requires>
     <import addon="xbmc.python" version="3.0.0"/>
@@ -19,9 +19,10 @@
     <platform>all</platform>
     <license>MIT</license>
     <source>https://github.com/KamenPeter/kodi-favourites-sync</source>
-    <news>v1.0.73.1: CRITICAL HOTFIX - Local driver now properly detects unavailable network paths (prevents data loss)
-v1.0.73: CRITICAL FIX - Preserve local favourites when cloud storage is unavailable
-v1.0.72: NEW - Modern WindowXML dialogs for profile management (Estuary-style UI)</news>
+    <news>v1.0.74.3: Switched to standard Kodi dialog UI (removed custom WindowXML styling). Uses native dialog.select() for standard Kodi appearance.
+v1.0.74.2: UI VISIBILITY FIX - Added button textures, uses Kodi's standard color scheme (removed forced colors)
+v1.0.74.1: CRITICAL BUGFIX - Fixed addon ID error when opening Manage Profiles from Settings, removed option="close" to keep Settings open
+v1.0.74: WindowXML UI reliability improvements - added 720p support, detailed error logging, explicit error messages</news>
     <assets>
       <icon>icon.png</icon>
     </assets>

@@ -90,11 +90,11 @@ def main():
         # Manage Profiles
         log_info("addon.py main() - opening Manage Profiles dialog")
         try:
-            from . import ui_profiles_manage
+            from . import ui_profiles
         except ImportError:
-            import ui_profiles_manage
+            import ui_profiles
         try:
-            ui_profiles_manage.open_manage_dialog()
+            ui_profiles.open_dialog()
         except Exception as e:
             log_info(f"addon.py main() - error opening profiles UI: {e}")
             import traceback

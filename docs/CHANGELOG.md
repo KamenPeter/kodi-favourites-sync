@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.0.74 (2025-11-01)
+
+**WindowXML UI Reliability Improvements**
+
+**Goal:**
+Ensure the Estuary-style **Manage Profiles** and **Edit Profile** dialogs (introduced in v1.0.72) load reliably on all Kodi devices, especially those running 720p UI scaling.
+
+**Problem:**
+WindowXML dialogs only existed in 1080i resolution, causing devices with 720p UI scaling (Android TV, CoreELEC, low-res devices) to fail loading the dialogs. Additionally, failures were silent, making troubleshooting difficult.
+
+**Solution:**
+
+### 1. 720p UI Support
+Created 720p copies: `resources/skins/default/720p/DialogManageProfiles.xml` and `DialogEditProfile.xml`
+
+### 2. Detailed Logging
+- `[favourites-sync] DialogManageProfiles initialized`
+- `[favourites-sync] Opening WindowXMLDialog: {xml_file} from {path}`
+
+### 3. Explicit Error Messages
+Replaced silent fallback with detailed error dialogs showing XML path, resolution, and expected locations.
+
+### 4. Entry Point Verification
+Confirmed both settings.xml and addon.py call `ui_profiles_manage.open_manage_dialog()`
+
+**Files Modified:**
+- Added 720p XML copies
+- Enhanced error handling in ui_profiles_manage.py and ui_profile_edit.py
+- Version 1.0.74
+
+---
+
 ## 1.0.73 (2025-10-31)
 
 **CRITICAL FIX: Preserve Local Favourites When Cloud Unavailable**

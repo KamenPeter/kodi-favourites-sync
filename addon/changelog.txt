@@ -1,3 +1,40 @@
+v1.0.74.3 (2025-11-01)
+- Switched to standard Kodi dialog UI (removed custom WindowXML)
+- Changed addon.py to call ui_profiles.open_dialog() instead of ui_profiles_manage.open_manage_dialog()
+- Changed settings.xml to call ui_profiles.py instead of ui_profiles_manage.py
+- Uses native dialog.select() for completely standard Kodi appearance
+- No custom colors, no custom layouts - pure Kodi default styling
+- Legacy text-based dialog provides familiar Kodi UX
+
+v1.0.74.2 (2025-11-01)
+- UI VISIBILITY FIX: Buttons now have proper textures (buttons/button-focus.png and button-nofocus.png)
+- Uses Kodi's standard color scheme (removed forced white text colors)
+- Let Estuary skin handle default text colors for list items and buttons
+- Removed explicit textcolor, focusedcolor, disabledcolor, and colordiffuse overrides
+- Applied fixes to both 1080i and 720p versions of DialogManageProfiles.xml
+- UI now matches standard Kodi dialog appearance and color behavior
+
+v1.0.74.1 (2025-11-01)
+- CRITICAL BUGFIX: Fixed "No valid addon id could be obtained" error when opening Manage Profiles from Settings
+- Fixed UnboundLocalError when addon_path referenced before assignment in error handler
+- Pass addon ID explicitly: xbmcaddon.Addon('plugin.service.favourites-sync') for RunScript calls
+- Initialize addon_path = None before try block to prevent reference errors
+- Removed option="close" from settings.xml profiles_manage action
+- Settings dialog now stays open when Manage Profiles is clicked
+- Safe error handling: addon_path checked before use in error messages
+
+v1.0.74 (2025-11-01)
+- ENHANCEMENT: WindowXML UI reliability improvements
+- Added 720p copies of DialogManageProfiles.xml and DialogEditProfile.xml
+- Now supports devices running 720p UI scaling (Android TV, CoreELEC, etc.)
+- Added detailed initialization logging: "[favourites-sync] DialogManageProfiles initialized"
+- Added XML path logging before doModal() for troubleshooting resolution mismatches
+- Replaced silent fallback with explicit error dialogs showing XML path and resolution
+- Error messages now show expected XML locations (1080i/ and 720p/)
+- User can choose to fallback to legacy dialog or cancel when WindowXML fails
+- Improved error handling with detailed context for troubleshooting
+- Verified settings.xml and addon.py both call ui_profiles_manage.open_manage_dialog()
+
 v1.0.73.1 (2025-10-31)
 - CRITICAL HOTFIX: Local driver now properly raises error when parent directory doesn't exist
 - Fixed: Network path unavailable (H:\) was returning empty XML instead of error
