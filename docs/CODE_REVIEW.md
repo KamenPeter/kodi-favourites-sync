@@ -10,6 +10,29 @@ The goals are partially achieved. Fixes are required before the project can be c
 
 Basic profile discovery, editing dialogs, cross-add writing, reorder controls, and event-based scheduling are present. End-to-end multi-profile sync, credential handling, deletion tracking, and safe writes do not meet the documented acceptance criteria.
 
+## Implementation follow-up — 2026-10-04
+
+Code fixes for findings 1–9 have been implemented. The assessment and findings below describe the original review and are retained as historical context.
+
+- Profile synchronization now accepts explicit configuration and paths without mutating module globals. Configured profile state is stored under each target profile's `addon_data/plugin.service.favourites-sync/profile_sync/`, separate from global active-profile state. Missing favourites files can be initialized by sync.
+- Failed uploads retain their failure result and do not advance the committed baseline. Preview and error status updates retain previous history. Successful empty merges also commit an empty snapshot.
+- Local replacement uses unique temporary files, flush/fsync, and `os.replace` without prior deletion. Existing file permissions are retained. Sync, reorder, and cross-add share an OS lock on the target favourites path; locks release when the process exits. Local/SMB/NFS uploads and profile configuration saves also use locks.
+- Backend field and credential mapping is shared by normal sync, profile sync, and validation. Validation uses copied settings. Profile saves encrypt plaintext secrets; encryption/decryption failures no longer silently return plaintext or ciphertext to a driver.
+- New credentials use explicit `ENC:F:` (Fernet) or `ENC:X:` (XOR obfuscation) markers. Legacy `ENC:<base64>` credentials remain readable. XOR remains obfuscation rather than strong encryption; Fernet requires the optional `cryptography` library. Fernet credentials require that library to decrypt.
+- Merges preserve local order and append remote additions in order. Conflict resolution uses parsed backend timestamps; unknown remote times fall back to zero rather than the current time. Serialization respects the supplied order.
+- Profile schedules are evaluated independently of the global schedule and endpoint. The settings monitor snapshots its initial state so the first user change is applied.
+- Cross-add accepts the documented action, uses source-profile defaults with filtered indices, and supports default-target editing in the active standard dialog. “Add & Sync Now” uses bidirectional sync so a pull schedule cannot immediately discard the newly added item.
+
+Validation: 23 offline regression tests passed using real temporary filesystem operations and mocked Kodi APIs. Coverage includes failed replacement/save, lock contention, failed upload and retry, preview/error history preservation, empty baselines, legacy status/credential migration, profile state isolation, backend fields and HTTP/WebDAV driver configuration, credentials, merge ordering/timestamps, independent schedules, first settings change, and cross-add/editor behavior. Python source compilation and addon XML parsing also passed.
+
+Run the tests with:
+
+```text
+python -B -m unittest discover -s tests -p test_review_regressions.py -v
+```
+
+Live Kodi UI, Windows-specific lock behavior, shutdown timing, and real remote backend connections still require acceptance checks. Optional backend dependencies were not installed or exercised against remote services. Cooperative locks coordinate addon writers; Kodi itself and external applications do not use these locks. No release, installation, or deployment was performed.
+
 ## Findings
 
 ### 1. High — Multi-profile sync crashes and does not use isolated profile state

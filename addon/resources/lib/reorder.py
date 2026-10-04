@@ -223,7 +223,7 @@ def ensure_self_shortcut(entries: List[FavEntry]) -> bool:
     # Add self shortcut at beginning
     self_entry = FavEntry(
         name="Favourites Sync (Cloud)",
-        action=SELF_ACTIONS[1],  # Prefer RunAddon form
+        action=SELF_ACTIONS[1],  # Open the main menu through its script entry point.
         thumb="special://home/addons/plugin.service.favourites-sync/icon.png",
         type="addon"
     )
@@ -267,7 +267,7 @@ def write_atomic_with_backup(xml_bytes: bytes, dest: str) -> None:
     """Write favourites.xml atomically with backup"""
     # Create backup if file exists
     if os.path.exists(dest):
-        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
         backup_name = f"favourites_{timestamp}.xml.bak"
         backup_path = dest.replace("favourites.xml", backup_name)
         
@@ -281,23 +281,12 @@ def write_atomic_with_backup(xml_bytes: bytes, dest: str) -> None:
         except Exception as e:
             log_error(kvfmt(event="backup_failed", error=str(e)))
     
-    # Write to temp file first
-    tmp_path = dest + ".tmp"
     try:
-        with open(tmp_path, 'wb') as f:
-            f.write(xml_bytes)
-        
-        # Atomic rename
-        if os.path.exists(dest):
-            os.remove(dest)
-        os.rename(tmp_path, dest)
-        
-        log_info(kvfmt(event="write_success", path=dest))
-    except Exception as e:
-        log_error(kvfmt(event="write_failed", error=str(e)))
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
-        raise
+        from .storage import atomic_write
+    except ImportError:
+        from storage import atomic_write
+    atomic_write(dest, xml_bytes)
+    log_info(kvfmt(event='write_success', path=dest))
 
 
 def reload_favourites(manual_context: bool = False, skip_reload: bool = False):
@@ -314,6 +303,18 @@ def reload_favourites(manual_context: bool = False, skip_reload: bool = False):
 
 
 def reorder_favourites(manual_context: bool = False, skip_profile_reload: bool = False) -> Dict[str, Any]:
+    try:
+        try:
+            from .storage import file_lock
+        except ImportError:
+            from storage import file_lock
+        with file_lock(_get_favourites_path() + '.lock'):
+            return _reorder_favourites(manual_context, skip_profile_reload)
+    except OSError as exc:
+        return {'addons': 0, 'others': 0, 'changed': False, 'error': str(exc)}
+
+
+def _reorder_favourites(manual_context: bool = False, skip_profile_reload: bool = False) -> Dict[str, Any]:
     """
     Apply grouping/sorting rules + ensure-self/keep-first.
     Returns summary: {'addons': N, 'others': M, 'changed': bool}

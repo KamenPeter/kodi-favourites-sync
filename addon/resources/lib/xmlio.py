@@ -2,6 +2,10 @@ import xml.etree.ElementTree as ET
 import re
 from dataclasses import dataclass
 from typing import List, Tuple, Dict, Any, Optional
+try:
+	from .storage import atomic_write, file_lock
+except ImportError:
+	from storage import atomic_write, file_lock
 
 
 class Favourite:
@@ -114,22 +118,7 @@ def load_xml(data: bytes) -> List[Favourite]:
 def serialize(favs: List[Favourite]) -> bytes:
 	root = ET.Element("favourites")
 	
-	# Ensure "Favourites Sync (Cloud)" is always first
-	sync_addon = None
-	other_favs = []
-	
 	for f in favs:
-		if f.label == "Favourites Sync (Cloud)":
-			sync_addon = f
-		else:
-			other_favs.append(f)
-	
-	# Add sync addon first if it exists
-	if sync_addon:
-		root.append(sync_addon.to_element())
-	
-	# Then add all other favorites
-	for f in other_favs:
 		root.append(f.to_element())
 	
 	return ET.tostring(root, encoding="utf-8")
@@ -173,7 +162,8 @@ def merge_sets(local: List[Favourite], remote: List[Favourite], last_synced: Lis
 	idx_last = {f.key: f for f in (last_synced or [])}
 	
 	# Get union of ALL keys from all three sources
-	all_keys = set(idx_local.keys()) | set(idx_remote.keys()) | set(idx_last.keys())
+	# Retain local ordering; append remote additions in their existing order.
+	all_keys = dict.fromkeys(f.key for source in (local, remote, last_synced or []) for f in source)
 
 	merged: List[Favourite] = []
 	
@@ -284,6 +274,18 @@ def merge_sets(local: List[Favourite], remote: List[Favourite], last_synced: Lis
 
 
 def append_favourite_to_profile(profile_name: str, label: str, action: str, thumb: str = None) -> bool:
+	try:
+		try:
+			from .profiles_mgr import profile_favourites_path
+		except ImportError:
+			from profiles_mgr import profile_favourites_path
+		with file_lock(profile_favourites_path(profile_name) + '.lock'):
+			return _append_favourite_to_profile(profile_name, label, action, thumb)
+	except (OSError, ValueError):
+		return False
+
+
+def _append_favourite_to_profile(profile_name: str, label: str, action: str, thumb: str = None) -> bool:
 	"""
 	Append a favourite entry to a specific profile's favourites.xml.
 	
@@ -326,9 +328,9 @@ def append_favourite_to_profile(profile_name: str, label: str, action: str, thum
 		new_fav = Favourite(label=label, path=action, attrib=attrib)
 		
 		# Check for duplicates (same key)
-		key = new_fav.key
+		key = (normalize_title(new_fav.label), new_fav.path)
 		for fav in existing:
-			if fav.key == key:
+			if (normalize_title(fav.label), fav.path) == key:
 				log_info(kvfmt(event="append_favourite_duplicate", profile=profile_name, label=label))
 				return True  # Already exists, no need to add
 		
@@ -340,7 +342,8 @@ def append_favourite_to_profile(profile_name: str, label: str, action: str, thum
 		
 		# Create backup
 		if os.path.exists(fav_path):
-			backup_name = f"favourites_{time.strftime('%Y%m%d-%H%M%S')}.xml.bak"
+			from datetime import datetime
+			backup_name = f"favourites_{datetime.now().strftime('%Y%m%d-%H%M%S-%f')}.xml.bak"
 			backup_dir = os.path.dirname(fav_path)
 			# Use addon_data for backups
 			addon_data_backup_dir = fav_path.replace("favourites.xml", "addon_data/plugin.service.favourites-sync/")
@@ -354,14 +357,7 @@ def append_favourite_to_profile(profile_name: str, label: str, action: str, thum
 			except Exception:
 				pass  # Backup is optional
 		
-		# Atomic write
-		tmp_path = fav_path + ".tmp"
-		with open(tmp_path, "wb") as f:
-			f.write(updated_xml)
-		
-		if os.path.exists(fav_path):
-			os.remove(fav_path)
-		os.rename(tmp_path, fav_path)
+		atomic_write(fav_path, updated_xml)
 		
 		log_info(kvfmt(event="append_favourite_success", profile=profile_name, label=label, action=action))
 		return True

@@ -79,41 +79,17 @@ class Driver:
             raise IOError(f"Cannot read from SMB path {self.path}: {str(e)}")
     
     def upload(self, data: bytes, metadata: dict = None) -> None:
-        """Write data to the SMB share atomically"""
+        """Serialize writers and replace without deleting the previous file."""
         try:
-            # Create parent directory if it doesn't exist
-            parent = os.path.dirname(self.path)
-            if parent and not os.path.exists(parent):
-                os.makedirs(parent, exist_ok=True)
-            
-            # Atomic write: write to temp file then move
-            tmp_path = self.path + ".tmp"
-            with open(tmp_path, 'wb') as f:
-                f.write(data)
-            
-            # Replace existing file
-            if os.path.exists(self.path):
-                os.remove(self.path)
-            os.rename(tmp_path, self.path)
-            
-        except PermissionError:
-            # Clean up temp file if it exists
-            tmp_path = self.path + ".tmp"
-            if os.path.exists(tmp_path):
-                try:
-                    os.remove(tmp_path)
-                except:
-                    pass
-            raise IOError(f"Permission denied writing to SMB path {self.path}")
-        except Exception as e:
-            # Clean up temp file if it exists
-            tmp_path = self.path + ".tmp"
-            if os.path.exists(tmp_path):
-                try:
-                    os.remove(tmp_path)
-                except:
-                    pass
-            raise IOError(f"Cannot write to SMB path {self.path}: {str(e)}")
+            from ..storage import atomic_write, file_lock
+        except ImportError:
+            from storage import atomic_write, file_lock
+        with file_lock(self.path + '.lock'):
+            if metadata and metadata.get('etag'):
+                current = self.stat().get('etag')
+                if current != metadata['etag']:
+                    raise IOError('File changed since download (ETag mismatch)')
+            atomic_write(self.path, data)
     
     def copy_backup(self, backup_name: str) -> None:
         """Create a backup copy of the file on the SMB share"""

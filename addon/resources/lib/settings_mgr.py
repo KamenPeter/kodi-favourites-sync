@@ -11,7 +11,7 @@ def _get_addon():
     global _ADDON
     if _ADDON is None:
         try:
-            _ADDON = xbmcaddon.Addon()
+            _ADDON = xbmcaddon.Addon('plugin.service.favourites-sync')
         except RuntimeError:
             _ADDON = xbmcaddon.Addon("plugin.service.favourites-sync")
     return _ADDON

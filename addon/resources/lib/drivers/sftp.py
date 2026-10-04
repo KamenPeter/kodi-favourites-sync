@@ -24,6 +24,7 @@ class Driver:
         self.user = cfg.get("sftp_user", "")
         self.password = cfg.get("sftp_password", "")
         self.keyfile = cfg.get("sftp_keyfile", "")
+        self.key_password = cfg.get('sftp_key_password', '') or None
         self.remote_path = cfg.get("sftp_path", "")
         self.timeout = int(cfg.get("timeout_sec", 15) or 15)
         
@@ -61,6 +62,7 @@ class Driver:
                     port=self.port,
                     username=self.user,
                     key_filename=self.keyfile,
+                    passphrase=self.key_password,
                     timeout=self.timeout
                 )
             else:

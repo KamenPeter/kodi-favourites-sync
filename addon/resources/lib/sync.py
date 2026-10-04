@@ -1,4 +1,7 @@
 import os, time, json, hashlib
+from functools import partial
+from datetime import datetime
+from email.utils import parsedate_to_datetime
 import xbmc, xbmcgui, xbmcvfs, xbmcaddon
 try:
     from .logutil import log_info, log_error, log_debug, kvfmt
@@ -12,12 +15,15 @@ try:
     from . import xmlio
 except Exception:
     import xmlio
-
-# Try to initialize addon, with fallback for scripts run outside normal context
 try:
-    ADDON = xbmcaddon.Addon()
-except RuntimeError:
-    ADDON = xbmcaddon.Addon("plugin.service.favourites-sync")
+    from .storage import atomic_write, acquire_lock, release_lock
+    from .backend_config import FIELDS, decrypt_driver_config, profile_driver_config
+except ImportError:
+    from storage import atomic_write, acquire_lock, release_lock
+    from backend_config import FIELDS, decrypt_driver_config, profile_driver_config
+
+# Use the service's settings even when imported by the launcher addon.
+ADDON = xbmcaddon.Addon("plugin.service.favourites-sync")
 
 PROFILE = xbmcvfs.translatePath("special://profile/")
 LOCAL_FAV = os.path.join(PROFILE, "favourites.xml")
@@ -40,57 +46,45 @@ def _hash(data) -> str:
 
 
 def _xbmcvfs_read(path) -> bytes:
+    # All sync paths are translated local filesystem paths. Only absence is empty;
+    # permission and I/O failures must abort rather than look like deletions.
     try:
-        if not xbmcvfs.exists(path):
-            return b""
-        f = xbmcvfs.File(path, 'rb')
-        try:
-            data = f.read()
-            # Ensure we return bytes
-            if isinstance(data, str):
-                data = data.encode('utf-8')
-            return data
-        finally:
-            f.close()
-    except Exception:
+        with open(path, 'rb') as stream:
+            return stream.read()
+    except FileNotFoundError:
         return b""
 
 
 def _xbmcvfs_write_atomic(path, data: bytes):
-    tmp = path + ".tmp"
-    f = xbmcvfs.File(tmp, 'wb')
-    try:
-        f.write(data)
-    finally:
-        f.close()
-    try:
-        xbmcvfs.delete(path)
-    except Exception:
-        pass
-    xbmcvfs.rename(tmp, path)
+    atomic_write(path, data)
 
 
-def _save_status(d: dict):
+def _save_status(d: dict, path=STATUS_JSON):
     try:
-        with open(STATUS_JSON, "w", encoding="utf-8") as f:
-            json.dump(d, f, indent=2)
+        previous = _load_status(path)
+        # Operation status must never erase the last committed sync state.
+        for key in ('last_synced_items', 'last_synced_hash', 'remote_hash',
+                    'remote_etag', 'remote_modified_at', 'base_hash', 'local_hash', 'commit_id'):
+            if key not in d and key in previous:
+                d[key] = previous[key]
+        atomic_write(path, json.dumps(d, indent=2).encode('utf-8'))
     except Exception as e:
         log_error(f"{kvfmt(event='status_write_error', error=str(e))}")
 
 
-def _load_status() -> dict:
+def _load_status(path=STATUS_JSON) -> dict:
     try:
-        with open(STATUS_JSON, "r", encoding="utf-8") as f:
+        with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception:
         return {}
 
 
-def _read_base() -> bytes:
+def _read_base(path=BASE_SNAPSHOT) -> bytes:
     """Read BASE snapshot (last known common version for 3-way merge)"""
     try:
-        if os.path.exists(BASE_SNAPSHOT):
-            with open(BASE_SNAPSHOT, "rb") as f:
+        if os.path.exists(path):
+            with open(path, "rb") as f:
                 return f.read()
         return b""
     except Exception as e:
@@ -98,26 +92,17 @@ def _read_base() -> bytes:
         return b""
 
 
-def _write_base(data: bytes):
+def _write_base(data: bytes, path=BASE_SNAPSHOT):
     """Write BASE snapshot atomically"""
-    try:
-        tmp = BASE_SNAPSHOT + ".tmp"
-        with open(tmp, "wb") as f:
-            f.write(data)
-        try:
-            if os.path.exists(BASE_SNAPSHOT):
-                os.remove(BASE_SNAPSHOT)
-        except Exception:
-            pass
-        os.rename(tmp, BASE_SNAPSHOT)
-        log_info(kvfmt(event="base_snapshot_saved", size=len(data)))
-    except Exception as e:
-        log_error(kvfmt(event="base_write_error", error=str(e)))
+    atomic_write(path, data)
+    log_info(kvfmt(event="base_snapshot_saved", size=len(data)))
 
 
-def _load_last_synced_items() -> list:
-    """Load last synced items from status.json and convert to Favourite objects"""
-    status = _load_status()
+def _load_last_synced_items(status_path=STATUS_JSON, base_path=BASE_SNAPSHOT) -> list:
+    """Read the committed snapshot, with migration from legacy status history."""
+    if os.path.exists(base_path):
+        return xmlio.load_xml(_xbmcvfs_read(base_path))
+    status = _load_status(status_path)
     last_synced_items = status.get("last_synced_items", [])
     if not last_synced_items:
         return []
@@ -137,21 +122,21 @@ def _load_last_synced_items() -> list:
     return favourites
 
 
-def _backup_local(max_count: int) -> str:
-    ts = time.strftime("%Y%m%d-%H%M%S")
+def _backup_local(max_count: int, local_path=LOCAL_FAV, data_dir=ADDON_DATA) -> str:
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
     name = f"favourites_{ts}.xml.bak"
-    dst = os.path.join(ADDON_DATA, name)
-    data = _xbmcvfs_read(LOCAL_FAV)
+    dst = os.path.join(data_dir, name)
+    data = _xbmcvfs_read(local_path)
     if not data:
         return ""
     _xbmcvfs_write_atomic(dst, data)
     # rotate
     try:
-        entries = sorted([p for p in os.listdir(ADDON_DATA) if p.startswith("favourites_") and p.endswith(".xml.bak")])
+        entries = sorted([p for p in os.listdir(data_dir) if p.startswith("favourites_") and p.endswith(".xml.bak")])
         if len(entries) > max_count:
             for old in entries[0:len(entries)-max_count]:
                 try:
-                    os.remove(os.path.join(ADDON_DATA, old))
+                    os.remove(os.path.join(data_dir, old))
                 except Exception:
                     pass
     except Exception:
@@ -188,10 +173,22 @@ def _settings_dict() -> dict:
         "local_backups": gb("local_backups", True),
         "conflict_policy": ["cloud", "local", "merge", "manual"][int(g("conflict_policy", "0"))],
     })
+    for fields in FIELDS.values():
+        for key in fields:
+            if key not in d:
+                d[key] = g(key)
+    d['s3_versioning'] = g('s3_versioning', 'true')
+    d['sftp_port'] = g('sftp_port', '22')
+    d['s3_region'] = g('s3_region', 'us-east-1')
     return d
 
 
 def _backend_from_settings(cfg: dict):
+    try:
+        from .profiles_mgr import decrypt_secret
+    except ImportError:
+        from profiles_mgr import decrypt_secret
+    cfg = decrypt_driver_config(cfg, decrypt_secret)
     backend = cfg.get("backend")
     
     if backend == "webdav":
@@ -267,23 +264,28 @@ def validate_endpoint(addon_instance=None) -> dict:
         return {"ok": False, "error": str(e)}
 
 
-def _acquire_lock():
-    if os.path.exists(LOCK_FILE):
-        return False
+def _acquire_lock(path=LOCAL_FAV + '.lock'):
     try:
-        with open(LOCK_FILE, "w") as f:
-            f.write(str(os.getpid()))
-        return True
-    except Exception:
-        return False
+        return acquire_lock(path)
+    except OSError:
+        return None
 
 
-def _release_lock():
+def _release_lock(handle):
+    release_lock(handle)
+
+
+def _remote_mtime(metadata):
+    value = metadata.get('modified_at') or metadata.get('modified')
+    if not value:
+        return 0.0  # Unknown remote time: prefer local when its time is known.
     try:
-        if os.path.exists(LOCK_FILE):
-            os.remove(LOCK_FILE)
-    except Exception:
-        pass
+        return datetime.fromisoformat(str(value).replace('Z', '+00:00')).timestamp()
+    except (ValueError, TypeError):
+        try:
+            return parsedate_to_datetime(str(value)).timestamp()
+        except (ValueError, TypeError, OverflowError):
+            return 0.0
 
 
 def _apply_reordering(merged_list: list) -> bytes:
@@ -409,16 +411,28 @@ def _apply_reordering(merged_list: list) -> bytes:
         return xmlio.serialize(xmlio.normalize(merged_list))
 
 
-def _run(mode: str, dry_run: bool = False, skip_profile_reload: bool = False) -> dict:
+def _run(mode: str, dry_run: bool = False, skip_profile_reload: bool = False,
+         config=None, local_path=None, data_dir=None, profile_name=None) -> dict:
+    LOCAL_FAV = local_path or globals()['LOCAL_FAV']
+    data_dir = data_dir or ADDON_DATA
+    os.makedirs(data_dir, exist_ok=True)
+    status_path = os.path.join(data_dir, 'status.json')
+    base_path = os.path.join(data_dir, 'base_snapshot.xml')
+    # Bind operation state locally; concurrent profiles never mutate module globals.
+    _save_status = partial(globals()['_save_status'], path=status_path)
+    _load_status = partial(globals()['_load_status'], path=status_path)
+    _write_base = partial(globals()['_write_base'], path=base_path)
+    _load_last_synced_items = partial(globals()['_load_last_synced_items'], status_path, base_path)
+    _backup_local = partial(globals()['_backup_local'], local_path=LOCAL_FAV, data_dir=data_dir)
     status = {"last_run": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
               "last_mode": mode, "result": "error", "changed_items": 0, "error": None}
-    if not _acquire_lock():
+    lock = _acquire_lock(LOCAL_FAV + '.lock')
+    if lock is None:
         status["error"] = "Another sync is running"
-        _save_status(status)
         return status
-    log_info(kvfmt(event="sync_start", mode=mode, skip_reload=skip_profile_reload))
+    log_info(kvfmt(event="sync_start", mode=mode, skip_reload=skip_profile_reload, profile=profile_name))
     try:
-        cfg = _settings_dict()
+        cfg = dict(config) if config is not None else _settings_dict()
         backend = _backend_from_settings(cfg)
         
         # CRITICAL: Try to access cloud BEFORE reading/modifying local file
@@ -456,7 +470,6 @@ def _run(mode: str, dry_run: bool = False, skip_profile_reload: bool = False) ->
             status["error_detail"] = str(e)  # Keep full error for logs
             status["result"] = "cloud_unavailable"
             _save_status(status)
-            _release_lock()
             return status
         
         # Cloud is accessible - safe to proceed with sync
@@ -485,7 +498,7 @@ def _run(mode: str, dry_run: bool = False, skip_profile_reload: bool = False) ->
         remote_changed = (remote_hash != last.get("remote_hash", ""))
         
         # Conflict: both local and remote changed since last sync
-        conflict = (local_changed and remote_changed and mode == "bidirectional")
+        conflict = (local_changed and remote_changed and mode in ("bidirectional", "dryrun"))
         
         if conflict:
             log_info(kvfmt(event="conflict_detected", 
@@ -516,7 +529,7 @@ def _run(mode: str, dry_run: bool = False, skip_profile_reload: bool = False) ->
             # Three-way merge with last_synced_list for proper deletion handling
             merged_list, stats = xmlio.merge_sets(local_list, remote_list, last_synced_list, prefer=prefer,
                                                   local_mtime=os.path.getmtime(LOCAL_FAV) if os.path.exists(LOCAL_FAV) else 0.0,
-                                                  remote_mtime=time.time())
+                                                  remote_mtime=_remote_mtime(remote_meta))
         elif mode == "dryrun":
             # Preview bidirectional merge with conflict detection and three-way merge
             if conflict:
@@ -529,7 +542,7 @@ def _run(mode: str, dry_run: bool = False, skip_profile_reload: bool = False) ->
                 prefer = "newer"
             merged_list, stats = xmlio.merge_sets(local_list, remote_list, last_synced_list, prefer=prefer,
                                                   local_mtime=os.path.getmtime(LOCAL_FAV) if os.path.exists(LOCAL_FAV) else 0.0,
-                                                  remote_mtime=time.time())
+                                                  remote_mtime=_remote_mtime(remote_meta))
         else:
             raise ValueError("Unknown mode")
 
@@ -538,7 +551,9 @@ def _run(mode: str, dry_run: bool = False, skip_profile_reload: bool = False) ->
         
         # Apply local reordering rules to merged result before finalizing
         # This ensures grouping/sorting settings are respected after sync
-        output_bytes = _apply_reordering(merged_list)
+        # Inactive profiles must not inherit the active profile's ordering settings.
+        output_bytes = (xmlio.serialize(xmlio.normalize(merged_list)) if profile_name
+                        else _apply_reordering(merged_list))
 
         if dry_run or mode == "dryrun":
             status.update({
@@ -557,7 +572,7 @@ def _run(mode: str, dry_run: bool = False, skip_profile_reload: bool = False) ->
             return status
 
         # Backups
-        if ADDON.getSettingBool("local_backups"):
+        if cfg.get('local_backups', True):
             try:
                 _backup_local(int(cfg.get("backup_count") or 5))
             except Exception as e:
@@ -666,13 +681,15 @@ def _run(mode: str, dry_run: bool = False, skip_profile_reload: bool = False) ->
                     status["error_detail"] = str(e)
                     status["result"] = "cloud_unavailable"
                     _save_status(status)
-                    _release_lock()
                     return status
+                # Neither status history nor BASE is committed after upload failure.
+                _save_status(status)
+                return status
 
         # Calculate hashes for 3-way merge tracking
         final_local_bytes = _xbmcvfs_read(LOCAL_FAV)
         final_local_hash = _hash(final_local_bytes)
-        base_hash = _hash(_read_base())
+        committed_bytes = (local_bytes or output_bytes) if mode == 'push' else output_bytes
         
         # Generate commit_id for this sync operation
         import uuid
@@ -688,27 +705,24 @@ def _run(mode: str, dry_run: bool = False, skip_profile_reload: bool = False) ->
             "changed_items_list": stats.get("changed_items", []),
             "removed_items": stats.get("removed_items", []),
             "last_synced_hash": final_local_hash,
-            "remote_hash": remote_hash,
+            "remote_hash": _hash(committed_bytes) if mode in ('push', 'bidirectional') else remote_hash,
             "error": None,
             # Extended schema for 3-way merge and conflict detection
-            "remote_etag": remote_meta.get("etag", ""),
-            "remote_modified_at": remote_meta.get("modified", ""),
-            "base_hash": base_hash,
+            "remote_etag": remote_meta.get("etag", "") if mode == 'pull' else "",
+            "remote_modified_at": remote_meta.get("modified_at", ""),
+            "base_hash": _hash(committed_bytes),
             "local_hash": final_local_hash,
             "commit_id": commit_id,
             # Save last synced items for three-way merge in next sync
             "last_synced_items": [
                 {"label": f.label, "path": f.path, "attrib": f.attrib}
-                for f in merged_list
-            ] if merged_list else []
+                for f in xmlio.load_xml(committed_bytes)
+            ]
         })
+        # Commit even an empty baseline: deleting the final item is a real sync.
+        _write_base(committed_bytes)
         _save_status(status)
-        
-        # Update BASE snapshot to the merged result for next 3-way merge
-        if merged_list and mode in ("bidirectional", "pull"):
-            base_bytes = xmlio.serialize(xmlio.normalize(merged_list))
-            _write_base(base_bytes)
-            log_info(kvfmt(event="base_updated", commit_id=commit_id))
+        log_info(kvfmt(event="base_updated", commit_id=commit_id))
         
         # Log detailed changes (requirement #2 from 1.0.33)
         log_info(kvfmt(event="sync_success", mode=mode, changed=status["changed_items"], commit_id=commit_id))
@@ -736,12 +750,16 @@ def _run(mode: str, dry_run: bool = False, skip_profile_reload: bool = False) ->
         
         return status
     except Exception as e:
+        status['result'] = 'error'
+        for key in ('last_synced_items', 'last_synced_hash', 'remote_hash', 'remote_etag',
+                    'remote_modified_at', 'base_hash', 'local_hash', 'commit_id'):
+            status.pop(key, None)
         status["error"] = str(e)
         _save_status(status)
         log_error(kvfmt(event="sync_error", error=str(e)))
         return status
     finally:
-        _release_lock()
+        _release_lock(lock)
 
 
 def run_sync_ui(mode):
@@ -811,143 +829,29 @@ def run_sync_ui(mode):
         d.ok("Favourites Sync", f"Failed: {res.get('error')}")
 
 
-def run_sync_for_profile(profile_name: str, mode: str = "bidirectional", 
+def run_sync_for_profile(profile_name: str, mode: str = "bidirectional",
                          skip_profile_reload: bool = True) -> dict:
-    """
-    Run sync for a specific profile using its configured backend.
-    
-    Args:
-        profile_name: Profile name from profiles.json
-        mode: Sync mode (bidirectional, pull, push)
-        skip_profile_reload: Skip Kodi profile reload after sync
-        
-    Returns:
-        dict: Sync result with status, stats, and any errors
-    """
+    """Synchronize using the target profile's configuration and state directory."""
     try:
-        from . import profiles_mgr
-    except ImportError:
-        import profiles_mgr
-    
-    log_info(kvfmt(event="profile_sync_start", profile=profile_name, mode=mode))
-    
-    # Load profile configuration
-    cfg_all = profiles_mgr.load_profiles_cfg()
-    profiles = cfg_all.get("profiles", {})
-    pcfg = profiles.get(profile_name)
-    
-    if not pcfg:
-        error_msg = f"Profile '{profile_name}' not found in profiles.json"
-        log_error(kvfmt(event="profile_sync_error", profile=profile_name, error=error_msg))
-        return {"result": "error", "error": error_msg}
-    
-    # Build driver configuration from profile settings
-    backend_type = pcfg.get("backend", {}).get("type", "")
-    backend_cfg = pcfg.get("backend", {})
-    
-    # Decrypt credentials if present
-    for cred_key in ["password", "access_key", "secret_key", "private_key_password"]:
-        if cred_key in backend_cfg:
-            encrypted = backend_cfg[cred_key]
-            if encrypted.startswith("ENC:"):
-                try:
-                    decrypted = profiles_mgr.decrypt_secret(encrypted)
-                    backend_cfg[cred_key] = decrypted
-                except Exception as e:
-                    log_error(kvfmt(event="profile_decrypt_error", key=cred_key, error=str(e)))
-    
-    # Get profile's favourites.xml path
-    local_fav_path = profiles_mgr.profile_favourites_path(profile_name)
-    if not local_fav_path or not os.path.exists(local_fav_path):
-        error_msg = f"Favourites file not found for profile '{profile_name}'"
-        log_error(kvfmt(event="profile_sync_error", profile=profile_name, error=error_msg))
-        return {"result": "error", "error": error_msg}
-    
-    # Temporarily override LOCAL_FAV for this sync
-    global LOCAL_FAV
-    original_local_fav = LOCAL_FAV
-    LOCAL_FAV = local_fav_path
-    
-    # Build driver configuration compatible with _settings_dict() format
-    driver_cfg = {
-        "backend": backend_type,
-        "conflict_policy": pcfg.get("conflict_policy", "remote_wins")
-    }
-    
-    # Map backend-specific settings
-    if backend_type == "webdav":
-        driver_cfg.update({
-            "webdav_url": backend_cfg.get("url", ""),
-            "webdav_path": backend_cfg.get("path", ""),
-            "webdav_user": backend_cfg.get("username", ""),
-            "webdav_pass": backend_cfg.get("password", "")
-        })
-    elif backend_type == "s3":
-        driver_cfg.update({
-            "s3_bucket": backend_cfg.get("bucket", ""),
-            "s3_path": backend_cfg.get("path", ""),
-            "s3_access_key": backend_cfg.get("access_key", ""),
-            "s3_secret_key": backend_cfg.get("secret_key", ""),
-            "s3_region": backend_cfg.get("region", "us-east-1"),
-            "s3_endpoint": backend_cfg.get("endpoint", "")
-        })
-    elif backend_type == "http":
-        driver_cfg.update({
-            "http_url": backend_cfg.get("url", ""),
-            "http_auth": backend_cfg.get("auth_type", "none"),
-            "http_user": backend_cfg.get("username", ""),
-            "http_pass": backend_cfg.get("password", "")
-        })
-    elif backend_type == "sftp":
-        driver_cfg.update({
-            "sftp_host": backend_cfg.get("host", ""),
-            "sftp_port": backend_cfg.get("port", 22),
-            "sftp_user": backend_cfg.get("username", ""),
-            "sftp_pass": backend_cfg.get("password", ""),
-            "sftp_path": backend_cfg.get("path", ""),
-            "sftp_key": backend_cfg.get("private_key_path", ""),
-            "sftp_key_pass": backend_cfg.get("private_key_password", "")
-        })
-    elif backend_type == "smb":
-        driver_cfg.update({
-            "smb_host": backend_cfg.get("host", ""),
-            "smb_share": backend_cfg.get("share", ""),
-            "smb_path": backend_cfg.get("path", ""),
-            "smb_user": backend_cfg.get("username", ""),
-            "smb_pass": backend_cfg.get("password", ""),
-            "smb_domain": backend_cfg.get("domain", "")
-        })
-    elif backend_type == "nfs":
-        driver_cfg.update({
-            "nfs_host": backend_cfg.get("host", ""),
-            "nfs_export": backend_cfg.get("export_path", ""),
-            "nfs_path": backend_cfg.get("path", "")
-        })
-    elif backend_type == "local":
-        driver_cfg.update({
-            "local_path": backend_cfg.get("path", "")
-        })
-    
-    try:
-        # Create backend driver
-        backend = _backend_from_settings(driver_cfg)
-        
-        # Run sync using existing _run() logic
-        result = _run(mode, dry_run=False, skip_profile_reload=skip_profile_reload)
-        
-        log_info(kvfmt(event="profile_sync_complete", profile=profile_name, 
-                      result=result.get("result"), changed=result.get("changed_items", 0)))
-        
-        return result
-        
-    except Exception as e:
-        error_msg = f"Profile sync error: {str(e)}"
-        log_error(kvfmt(event="profile_sync_error", profile=profile_name, error=error_msg))
-        return {"result": "error", "error": error_msg}
-        
-    finally:
-        # Restore original LOCAL_FAV
-        LOCAL_FAV = original_local_fav
+        try:
+            from . import profiles_mgr
+        except ImportError:
+            import profiles_mgr
+        profiles = profiles_mgr.list_kodi_profiles()
+        if profile_name not in profiles:
+            raise ValueError("Unknown Kodi profile: " + profile_name)
+        pcfg = profiles_mgr.get_profile_cfg(profiles_mgr.load_profiles_cfg(), profile_name)
+        if not pcfg or not pcfg.get('backend'):
+            raise ValueError("No backend configured for profile: " + profile_name)
+        directory = profiles[profile_name]
+        return _run(mode, skip_profile_reload=skip_profile_reload,
+                    config=profile_driver_config(pcfg),
+                    local_path=os.path.join(directory, 'favourites.xml'),
+                    data_dir=os.path.join(directory, 'addon_data', 'plugin.service.favourites-sync', 'profile_sync'),
+                    profile_name=profile_name)
+    except Exception as exc:
+        log_error(kvfmt(event='profile_sync_error', profile=profile_name, error=str(exc)))
+        return {'result': 'error', 'error': str(exc)}
 
 
 def run_scheduled_once(cfg, monitor: xbmc.Monitor):
@@ -980,4 +884,3 @@ def run_scheduled_once(cfg, monitor: xbmc.Monitor):
         # Startup-only mode - no periodic sync
         # Just wait indefinitely
         monitor.waitForAbort()
-

@@ -32,7 +32,7 @@ def _load_base_settings_defaults():
         dict: Default configuration with backend, schedule, and conflict_policy
     """
     try:
-        addon = xbmcaddon.Addon()
+        addon = xbmcaddon.Addon('plugin.service.favourites-sync')
         
         # Load backend settings
         backend_idx = int(addon.getSetting("backend") or "0")
@@ -267,7 +267,7 @@ def _edit_profile_dialog(profile_name: str, pcfg: dict) -> dict:
             f"Conflict Policy: {policy_display}",
             "",
             f"Enable Cross-Add: {cross_add_display}",
-            "",
+            "Default Cross-Add Targets...",
             "[B]Validate Endpoint[/B]",
             "[B]Save[/B]",
             "[B]Cancel[/B]"
@@ -334,6 +334,14 @@ def _edit_profile_dialog(profile_name: str, pcfg: dict) -> dict:
             # Toggle cross-add
             new_cfg["cross_add"]["enabled"] = not cross_add.get("enabled", False)
             continue
+        if choice == 11:
+            names = profiles_mgr.get_profile_names({}, exclude=profile_name)
+            current = cross_add.get('auto_targets', [])
+            selected = dialog.multiselect('Default Target Profiles', names,
+                                          preselect=[i for i, name in enumerate(names) if name in current])
+            if selected is not None:
+                new_cfg['cross_add']['auto_targets'] = [names[i] for i in selected]
+            continue
 
 
 def _configure_backend_dialog(backend: str, config: dict) -> dict:
@@ -352,9 +360,8 @@ def _configure_backend_dialog(backend: str, config: dict) -> dict:
     import copy
     new_config = copy.deepcopy(config)
     
-    # Decrypt password for editing
-    if "password" in new_config:
-        new_config["password"] = profiles_mgr.decrypt_secret(new_config["password"])
+    # Keep the stored configuration encrypted; decrypt only input defaults.
+    password_default = profiles_mgr.decrypt_secret(new_config.get('password', ''))
     
     if backend == "webdav":
         # WebDAV configuration
@@ -370,7 +377,7 @@ def _configure_backend_dialog(backend: str, config: dict) -> dict:
         new_config["webdav_user"] = user
         
         if user:
-            password = dialog.input("Password (optional)", new_config.get("password", ""), type=xbmcgui.INPUT_ALPHANUM, option=xbmcgui.ALPHANUM_HIDE_INPUT)
+            password = dialog.input("Password (optional)", password_default, type=xbmcgui.INPUT_ALPHANUM, option=xbmcgui.ALPHANUM_HIDE_INPUT)
             if password:
                 new_config["password"] = profiles_mgr.encrypt_secret(password)
             elif not password and "password" in new_config:
@@ -406,7 +413,7 @@ def _configure_backend_dialog(backend: str, config: dict) -> dict:
         if access:
             new_config["s3_access"] = access
         
-        secret = dialog.input("Secret Key", new_config.get("s3_secret", ""), type=xbmcgui.INPUT_ALPHANUM, option=xbmcgui.ALPHANUM_HIDE_INPUT)
+        secret = dialog.input("Secret Key", profiles_mgr.decrypt_secret(new_config.get("s3_secret", "")), type=xbmcgui.INPUT_ALPHANUM, option=xbmcgui.ALPHANUM_HIDE_INPUT)
         if secret:
             new_config["s3_secret"] = profiles_mgr.encrypt_secret(secret)
     
@@ -420,7 +427,7 @@ def _configure_backend_dialog(backend: str, config: dict) -> dict:
         if put_url:
             new_config["http_put"] = put_url
         
-        auth = dialog.input("Auth Header (optional)", new_config.get("http_auth_header", ""))
+        auth = dialog.input("Auth Header (optional)", profiles_mgr.decrypt_secret(new_config.get("http_auth_header", "")))
         if auth:
             new_config["http_auth_header"] = profiles_mgr.encrypt_secret(auth)
     
@@ -438,7 +445,7 @@ def _configure_backend_dialog(backend: str, config: dict) -> dict:
         if user:
             new_config["sftp_user"] = user
         
-        password = dialog.input("Password", new_config.get("password", ""), type=xbmcgui.INPUT_ALPHANUM, option=xbmcgui.ALPHANUM_HIDE_INPUT)
+        password = dialog.input("Password", password_default, type=xbmcgui.INPUT_ALPHANUM, option=xbmcgui.ALPHANUM_HIDE_INPUT)
         if password:
             new_config["password"] = profiles_mgr.encrypt_secret(password)
         

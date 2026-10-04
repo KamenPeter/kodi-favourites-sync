@@ -25,11 +25,13 @@ def main():
         # Get action from arguments
         action = "cross_add"  # Default
         if len(sys.argv) > 1:
-            action = sys.argv[1]
+            action = sys.argv[1].strip()
+            if action.startswith('action='):
+                action = action.split('=', 1)[1]
         
         log_info(kvfmt(event="context_script_invoked", action=action))
         
-        if action == "cross_add":
+        if action in ("cross_add", "cross_add_current"):
             open_for_current_selection()
         else:
             log_error(kvfmt(event="context_script_unknown_action", action=action))

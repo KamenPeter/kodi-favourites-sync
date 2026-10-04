@@ -8,6 +8,7 @@ import os
 import json
 import hashlib
 import base64
+import copy
 import xbmcvfs
 from typing import Tuple
 
@@ -15,6 +16,12 @@ try:
     from .logutil import log_info, log_error, kvfmt
 except ImportError:
     from logutil import log_info, log_error, kvfmt
+try:
+    from .storage import atomic_write, file_lock
+    from .backend_config import SECRET_FIELDS, profile_driver_config
+except ImportError:
+    from storage import atomic_write, file_lock
+    from backend_config import SECRET_FIELDS, profile_driver_config
 
 # Paths
 USERDATA = xbmcvfs.translatePath("special://userdata/")
@@ -75,13 +82,7 @@ def profile_favourites_path(profile_name: str) -> str:
     if profile_name in profiles:
         return os.path.join(profiles[profile_name], "favourites.xml")
     
-    # Fallback: construct path manually
-    if profile_name == "Master":
-        profile_dir = xbmcvfs.translatePath("special://masterprofile/")
-    else:
-        profile_dir = os.path.join(PROFILES_DIR, profile_name)
-    
-    return os.path.join(profile_dir, "favourites.xml")
+    raise ValueError('Unknown Kodi profile: ' + profile_name)
 
 
 def _ensure_addon_data():
@@ -145,6 +146,8 @@ def load_profiles_cfg() -> dict:
         }
     
     log_info(kvfmt(event="profiles_cfg_initialized", count=len(default_cfg["profiles"])))
+    if not os.path.exists(PROFILES_JSON):
+        save_profiles_cfg(default_cfg)
     return default_cfg
 
 
@@ -158,14 +161,15 @@ def save_profiles_cfg(cfg: dict) -> None:
     _ensure_addon_data()
     
     try:
-        tmp_path = PROFILES_JSON + ".tmp"
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            json.dump(cfg, f, indent=2)
-        
-        # Atomic replace
-        if os.path.exists(PROFILES_JSON):
-            os.remove(PROFILES_JSON)
-        os.rename(tmp_path, PROFILES_JSON)
+        safe_cfg = copy.deepcopy(cfg)
+        for profile in safe_cfg.get('profiles', {}).values():
+            config = profile.get('config', {}) if isinstance(profile.get('backend'), str) else profile.get('backend', {})
+            for key in SECRET_FIELDS:
+                value = config.get(key)
+                if value and not value.startswith('ENC:'):
+                    config[key] = encrypt_secret(value)
+        with file_lock(PROFILES_JSON + '.lock'):
+            atomic_write(PROFILES_JSON, json.dumps(safe_cfg, indent=2).encode('utf-8'))
         
         log_info(kvfmt(event="profiles_cfg_saved", profiles=len(cfg.get("profiles", {}))))
         
@@ -230,18 +234,22 @@ def _get_or_create_keystore() -> dict:
         log_error(kvfmt(event="keystore_load_error", error=str(e)))
     
     # Create new keystore
-    import random
-    salt_bytes = bytes([random.randint(0, 255) for _ in range(16)])
+    salt_bytes = os.urandom(16)
     salt_b64 = base64.b64encode(salt_bytes).decode('utf-8')
     
     keystore = {"salt": salt_b64}
     
     try:
-        with open(KEYSTORE_JSON, "w", encoding="utf-8") as f:
-            json.dump(keystore, f, indent=2)
+        with file_lock(KEYSTORE_JSON + '.lock'):
+            # A concurrent creator may have installed the device key meanwhile.
+            if os.path.exists(KEYSTORE_JSON):
+                with open(KEYSTORE_JSON, encoding='utf-8') as stream:
+                    return json.load(stream)
+            atomic_write(KEYSTORE_JSON, json.dumps(keystore).encode('utf-8'))
         log_info(kvfmt(event="keystore_created"))
     except Exception as e:
         log_error(kvfmt(event="keystore_save_error", error=str(e)))
+        raise
     
     return keystore
 
@@ -293,7 +301,7 @@ def encrypt_secret(plain: str) -> str:
         f = Fernet(fernet_key)
         
         encrypted = f.encrypt(plain.encode('utf-8'))
-        return f"ENC:{base64.b64encode(encrypted).decode('utf-8')}"
+        return f"ENC:F:{base64.b64encode(encrypted).decode('utf-8')}"
         
     except ImportError:
         # Fallback: XOR with key + base64 (obfuscation, not strong encryption)
@@ -303,50 +311,32 @@ def encrypt_secret(plain: str) -> str:
         plain_bytes = plain.encode('utf-8')
         encrypted_bytes = bytes([plain_bytes[i] ^ key[i % len(key)] for i in range(len(plain_bytes))])
         
-        return f"ENC:{base64.b64encode(encrypted_bytes).decode('utf-8')}"
+        return f"ENC:X:{base64.b64encode(encrypted_bytes).decode('utf-8')}"
     
     except Exception as e:
         log_error(kvfmt(event="encrypt_error", error=str(e)))
-        return plain  # Fallback: return plaintext
+        raise ValueError('Unable to encrypt credential') from e
 
 
 def decrypt_secret(maybe_enc: str) -> str:
-    """
-    Decrypt a secret (or return as-is if not encrypted).
-    
-    Args:
-        maybe_enc: String that may be encrypted ("ENC:<base64>") or plaintext
-        
-    Returns:
-        str: Decrypted plaintext
-    """
-    if not maybe_enc or not maybe_enc.startswith("ENC:"):
+    """Read explicit formats and legacy ENC values without exposing ciphertext."""
+    if not maybe_enc or not maybe_enc.startswith('ENC:'):
         return maybe_enc
-    
+    payload = maybe_enc[4:]
+    method = None
+    if payload.startswith(('F:', 'X:')):
+        method, payload = payload.split(':', 1)
     try:
-        encrypted_b64 = maybe_enc[4:]  # Remove "ENC:" prefix
-        encrypted_bytes = base64.b64decode(encrypted_b64)
-        
-        # Try cryptography library first
-        try:
+        encrypted = base64.b64decode(payload, validate=True)
+        # Legacy Fernet tokens are recognizable before decryption.
+        method = method or ('F' if encrypted.startswith(b'gAAAA') else 'X')
+        key = _derive_key()
+        if method == 'F':
             from cryptography.fernet import Fernet
-            
-            key = _derive_key()
-            fernet_key = base64.urlsafe_b64encode(key)
-            f = Fernet(fernet_key)
-            
-            decrypted = f.decrypt(encrypted_bytes)
-            return decrypted.decode('utf-8')
-            
-        except ImportError:
-            # Fallback: XOR decryption
-            key = _derive_key()
-            decrypted_bytes = bytes([encrypted_bytes[i] ^ key[i % len(key)] for i in range(len(encrypted_bytes))])
-            return decrypted_bytes.decode('utf-8')
-        
-    except Exception as e:
-        log_error(kvfmt(event="decrypt_error", error=str(e)))
-        return maybe_enc  # Fallback: return as-is
+            return Fernet(base64.urlsafe_b64encode(key)).decrypt(encrypted).decode('utf-8')
+        return bytes(value ^ key[i % len(key)] for i, value in enumerate(encrypted)).decode('utf-8')
+    except Exception as exc:
+        raise ValueError('Unable to decrypt credential; check the device keystore and crypto support') from exc
 
 
 # ============================================================================
@@ -368,12 +358,6 @@ def validate_profile_endpoint(pcfg: dict) -> Tuple[bool, str]:
         if not backend:
             return (False, "No backend configured")
         
-        config = pcfg.get("config", {})
-        
-        # Decrypt password if present
-        if "password" in config:
-            config["password"] = decrypt_secret(config["password"])
-        
         # Import backend factory from sync.py
         try:
             from .sync import _backend_from_settings
@@ -381,8 +365,7 @@ def validate_profile_endpoint(pcfg: dict) -> Tuple[bool, str]:
             from sync import _backend_from_settings
         
         # Build config dict in expected format
-        backend_cfg = {"backend": backend}
-        backend_cfg.update(config)
+        backend_cfg = profile_driver_config(pcfg)
         
         # Instantiate driver
         driver = _backend_from_settings(backend_cfg)

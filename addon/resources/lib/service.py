@@ -85,134 +85,16 @@ def run():
     # Check if this is a recent profile reload (triggered by our addon)
     is_reload = _is_recent_reload()
     
-    # Startup sync (runs if enabled and NOT a recent reload)
-    if cfg.enabled and cfg.on_startup and is_endpoint_valid() and not is_reload:
-        log_info(f"Waiting {cfg.startup_delay_seconds} seconds before startup sync...")
-        if not monitor.waitForAbort(cfg.startup_delay_seconds):
-            log_info("Running startup sync...")
-            try:
-                from .sync import _run, run_sync_for_profile
-            except Exception:
-                from sync import _run, run_sync_for_profile
-            
-            try:
-                # Standard single-profile sync
-                _run(cfg.scheduled_mode, skip_profile_reload=True)
-                log_info("Startup sync completed")
-            except Exception as e:
-                log_error(kvfmt(event="startup_sync_failed", error=str(e)))
-            
-            # Multi-profile startup sync
-            try:
-                from . import profiles_mgr
-            except Exception:
-                import profiles_mgr
-            
-            try:
-                pcfg = profiles_mgr.load_profiles_cfg()
-                profiles = pcfg.get("profiles", {})
-                
-                # Sync profiles with on_start=true
-                startup_profiles = [
-                    (name, cfg) for name, cfg in profiles.items()
-                    if cfg.get("schedule", {}).get("on_start", False)
-                ]
-                
-                if startup_profiles:
-                    log_info(kvfmt(event="multi_profile_startup_sync_start", count=len(startup_profiles)))
-                    
-                    for profile_name, profile_cfg in startup_profiles:
-                        try:
-                            mode = profile_cfg.get("schedule", {}).get("mode", "bidirectional")
-                            result = run_sync_for_profile(profile_name, mode, skip_profile_reload=True)
-                            
-                            if result.get("result") == "success":
-                                log_info(kvfmt(event="multi_profile_startup_sync_success", 
-                                              profile=profile_name, 
-                                              changed=result.get("changed_items", 0)))
-                            else:
-                                log_error(kvfmt(event="multi_profile_startup_sync_failed",
-                                               profile=profile_name,
-                                               error=result.get("error")))
-                        except Exception as e:
-                            log_error(kvfmt(event="multi_profile_startup_sync_error", 
-                                           profile=profile_name, 
-                                           error=str(e)))
-                    
-                    log_info(kvfmt(event="multi_profile_startup_sync_complete"))
-            except Exception as e:
-                log_error(kvfmt(event="multi_profile_startup_sync_load_error", error=str(e)))
-        else:
-            log_info("Startup sync cancelled - Kodi is shutting down during startup delay")
+    if not is_reload and not monitor.waitForAbort(cfg.startup_delay_seconds):
+        _run_scheduled_event('on_start', cfg)
     elif is_reload:
-        log_info(kvfmt(event="startup_sync_skipped", reason="recent_profile_reload"))
-    
-    # Main service loop - just wait for shutdown now (no periodic syncs)
+        log_info(kvfmt(event='startup_sync_skipped', reason='recent_profile_reload'))
+
+    # No file-watch or periodic synchronization.
     while not monitor.abortRequested():
-        # Just wait, no periodic syncs
         if monitor.waitForAbort(10):
             break
-    
-        # Shutdown sync if enabled
-    cfg = schedule_config()
-    if cfg.enabled and cfg.on_shutdown and is_endpoint_valid():
-        log_info("Running shutdown sync...")
-        try:
-            # Import sync function
-            try:
-                from .sync import _run, run_sync_for_profile
-            except Exception:
-                from sync import _run, run_sync_for_profile
-            
-            try:
-                # Standard single-profile sync
-                _run(cfg.scheduled_mode, skip_profile_reload=True)
-                log_info("Shutdown sync completed")
-            except Exception as e:
-                log_error(kvfmt(event="shutdown_sync_failed", error=str(e)))
-            
-            # Multi-profile shutdown sync
-            try:
-                from . import profiles_mgr
-            except Exception:
-                import profiles_mgr
-            
-            try:
-                pcfg = profiles_mgr.load_profiles_cfg()
-                profiles = pcfg.get("profiles", {})
-                
-                # Sync profiles with on_shutdown=true
-                shutdown_profiles = [
-                    (name, cfg) for name, cfg in profiles.items()
-                    if cfg.get("schedule", {}).get("on_shutdown", False)
-                ]
-                
-                if shutdown_profiles:
-                    log_info(kvfmt(event="multi_profile_shutdown_sync_start", count=len(shutdown_profiles)))
-                    
-                    for profile_name, profile_cfg in shutdown_profiles:
-                        try:
-                            mode = profile_cfg.get("schedule", {}).get("mode", "bidirectional")
-                            result = run_sync_for_profile(profile_name, mode, skip_profile_reload=True)
-                            
-                            if result.get("result") == "success":
-                                log_info(kvfmt(event="multi_profile_shutdown_sync_success", 
-                                              profile=profile_name, 
-                                              changed=result.get("changed_items", 0)))
-                            else:
-                                log_error(kvfmt(event="multi_profile_shutdown_sync_failed",
-                                               profile=profile_name,
-                                               error=result.get("error")))
-                        except Exception as e:
-                            log_error(kvfmt(event="multi_profile_shutdown_sync_error", 
-                                           profile=profile_name, 
-                                           error=str(e)))
-                    
-                    log_info(kvfmt(event="multi_profile_shutdown_sync_complete"))
-            except Exception as e:
-                log_error(kvfmt(event="multi_profile_shutdown_sync_load_error", error=str(e)))
-        except Exception as e:
-            log_error(kvfmt(event="shutdown_sync_import_failed", error=str(e)))
+    _run_scheduled_event('on_shutdown', schedule_config())
     
     # Stop RPC server before exiting
     try:
@@ -223,11 +105,47 @@ def run():
     log_info("Service stopped")
 
 
+def _run_scheduled_event(event, cfg):
+    try:
+        from .sync import _run, run_sync_for_profile
+        from . import profiles_mgr
+    except ImportError:
+        from sync import _run, run_sync_for_profile
+        import profiles_mgr
+    active_enabled = cfg.on_startup if event == 'on_start' else cfg.on_shutdown
+    if cfg.enabled and active_enabled:
+        try:
+            if is_endpoint_valid():
+                _run(cfg.scheduled_mode, skip_profile_reload=True)
+        except Exception as exc:
+            log_error(kvfmt(event='scheduled_sync_failed', error=str(exc)))
+    # Profile flags are independent of the active profile's global settings.
+    try:
+        profiles = profiles_mgr.load_profiles_cfg().get('profiles', {})
+        for name, profile in profiles.items():
+            schedule = profile.get('schedule', {})
+            if schedule.get(event):
+                result = run_sync_for_profile(name, schedule.get('mode', 'bidirectional'),
+                                              skip_profile_reload=True)
+                log_info(kvfmt(event='profile_scheduled_sync', profile=name, result=result.get('result')))
+    except Exception as exc:
+        log_error(kvfmt(event='profile_schedule_failed', error=str(exc)))
+
+
+def _misc_settings_snapshot():
+    try:
+        from .settings_mgr import misc_add_to_fav, misc_keep_first, misc_group_addons_top, misc_sort_addons
+    except ImportError:
+        from settings_mgr import misc_add_to_fav, misc_keep_first, misc_group_addons_top, misc_sort_addons
+    return {'add_to_fav': misc_add_to_fav(), 'keep_first': misc_keep_first(),
+            'group_top': misc_group_addons_top(), 'sort': misc_sort_addons()}
+
+
 class _Monitor(xbmc.Monitor):
     def __init__(self):
         super().__init__()
         self._last_validate_time = 0
-        self._last_settings_state = None
+        self._last_settings_state = _misc_settings_snapshot()
     
     def onSettingsChanged(self):
         """Handle settings changes - auto-apply reorder when user clicks OK"""

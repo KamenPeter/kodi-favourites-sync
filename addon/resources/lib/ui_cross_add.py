@@ -50,14 +50,21 @@ def open_for_current_selection():
         eligible_profiles = []
         preselect = []
         
-        for i, (profile_name, pcfg) in enumerate(sorted(profiles.items())):
+        source_profile = xbmc.getInfoLabel('System.ProfileName')
+        # Kodi's master display name can differ from the canonical directory name.
+        if source_profile not in profiles:
+            import os
+            import xbmcvfs
+            current_dir = os.path.normcase(os.path.normpath(xbmcvfs.translatePath('special://profile/')))
+            source_profile = next((name for name, directory in profiles_mgr.list_kodi_profiles().items()
+                                   if os.path.normcase(os.path.normpath(directory)) == current_dir), '')
+        auto_targets = profiles.get(source_profile, {}).get('cross_add', {}).get('auto_targets', [])
+        for profile_name, pcfg in sorted(profiles.items()):
             cross_add = pcfg.get("cross_add", {})
             if cross_add.get("enabled", False):
-                eligible_profiles.append(profile_name)
-                # Check if this profile is in auto_targets
-                auto_targets = cross_add.get("auto_targets", [])
                 if profile_name in auto_targets:
-                    preselect.append(i)
+                    preselect.append(len(eligible_profiles))
+                eligible_profiles.append(profile_name)
         
         if not eligible_profiles:
             dialog.notification("Cross-Add", "No profiles enabled for cross-add", xbmcgui.NOTIFICATION_WARNING, 3000)
@@ -105,9 +112,7 @@ def open_for_current_selection():
             sync_success = 0
             for profile_name in selected_profiles:
                 try:
-                    pcfg = profiles.get(profile_name, {})
-                    mode = pcfg.get("schedule", {}).get("mode", "bidirectional")
-                    result = run_sync_for_profile(profile_name, mode, skip_profile_reload=True)
+                    result = run_sync_for_profile(profile_name, 'bidirectional', skip_profile_reload=True)
                     
                     if result.get("result") == "success":
                         sync_success += 1

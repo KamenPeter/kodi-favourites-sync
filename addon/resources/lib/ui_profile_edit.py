@@ -60,7 +60,8 @@ class EditProfileWindow(xbmcgui.WindowXMLDialog):
         
         try:
             # Get or create profile config
-            self.pc = profiles_mgr.get_profile_cfg(self.cfg, self.profile_name)
+            import copy
+            self.pc = copy.deepcopy(profiles_mgr.get_profile_cfg(self.cfg, self.profile_name))
             
             if not self.pc or not self.pc.get("backend"):
                 # Load defaults from base settings for unconfigured profiles
