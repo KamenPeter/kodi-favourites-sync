@@ -1,3 +1,13 @@
+v1.0.75 (2026-10-04)
+- Fix profile sync configuration and isolate each profile's sync history.
+- Preserve merge history during previews, errors, and failed uploads.
+- Use safe atomic replacement and process locks for file writes.
+- Correct backend settings and credential mapping; keep saved secrets encrypted.
+- Preserve merge order and use actual remote modification timestamps.
+- Fix independent profile schedules and the first settings-change event.
+- Fix cross-add invocation, source defaults, and default-target editing.
+- Add 23 offline regression checks.
+
 v1.0.74.3 (2025-11-01)
 - Switched to standard Kodi dialog UI (removed custom WindowXML)
 - Changed addon.py to call ui_profiles.open_dialog() instead of ui_profiles_manage.open_manage_dialog()
